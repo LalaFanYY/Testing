@@ -161,5 +161,1418 @@
               </div>
               <div class="flex gap-1">
                 <button class="btn btn-soft !px-3 !py-1 text-sm" @click="editWeight(w)" x-text="t('edit')"></button>
-                
+                <button class="btn btn-soft !px-3 !py-1 text-sm" @click="delWeight(w.id)" x-text="t('delete')"></button>
+              </div>
+            </div>
+          </template>
+          <p class="text-center text-stone-400 py-3" x-show="!pet.weights.length" x-text="t('no_weights')"></p>
+        </div>
+      </section>
 
+      <!-- ========== 3. 醫療（子分頁） ========== -->
+      <section x-show="tab==='medical'" class="space-y-4">
+
+        <div class="flex gap-2 overflow-x-auto pb-1">
+          <template x-for="s in msubs" :key="s.id">
+            <button type="button" class="btn whitespace-nowrap text-sm" :class="msub===s.id ? 'btn-main' : 'btn-soft'" @click="msub=s.id" x-text="s.icon + ' ' + t('sub_' + s.id)"></button>
+          </template>
+        </div>
+
+        <!-- ---- 3a. 驅蟲提醒 ---- -->
+        <div x-show="msub==='care'" class="space-y-4">
+          <form class="card p-5 space-y-3" @submit.prevent="saveMed()">
+            <h3 class="font-extrabold text-lg" x-text="mForm.id ? '✏️ ' + t('med_edit_title') : '🛡️ ' + t('med_add_title')"></h3>
+            <div>
+              <label class="lbl" x-text="t('med_type')"></label>
+              <select class="inp" x-model="mForm.type">
+                <template x-for="mt in medTypesFor" :key="mt"><option :value="mt" x-text="lbl('mt_', mt)"></option></template>
+              </select>
+            </div>
+            <div>
+              <label class="lbl" x-text="t('med_name')"></label>
+              <input class="inp" required x-model="mForm.name" :placeholder="t('ph_med')">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="lbl" x-text="t('cycle')"></label>
+                <select class="inp" x-model="mForm.cycle">
+                  <template x-for="n in [30,60,90,180,365]" :key="n"><option :value="String(n)" x-text="t('every_n',{n:n})"></option></template>
+                  <option value="custom" x-text="t('custom_days')"></option>
+                </select>
+              </div>
+              <div>
+                <label class="lbl" x-text="t('last_dose')"></label>
+                <input type="date" class="inp" required x-model="mForm.last">
+              </div>
+            </div>
+            <div x-show="mForm.cycle==='custom'">
+              <label class="lbl" x-text="t('custom_cycle')"></label>
+              <input type="number" min="1" class="inp" x-model="mForm.custom" :placeholder="t('ph_custom')">
+            </div>
+            <div class="flex gap-2">
+              <button class="btn btn-main flex-1" type="submit" x-text="mForm.id ? t('save_changes') : t('add')"></button>
+              <button type="button" class="btn btn-soft" x-show="mForm.id" @click="resetMed()" x-text="t('cancel')"></button>
+            </div>
+          </form>
+
+          <template x-if="!pet.meds.length"><p class="text-center text-stone-400 py-4" x-text="t('no_meds')"></p></template>
+          <template x-for="m in sortedMeds" :key="m.id">
+            <div class="card p-4 space-y-3" :class="statusOf(m).key==='red' ? 'ring-2 ring-red-200' : ''">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <span class="text-xs bg-orange-100 text-orange-500 rounded-full px-2 py-0.5 font-bold" x-text="lbl('mt_', m.type)"></span>
+                  <h4 class="font-extrabold text-lg mt-1" x-text="m.name"></h4>
+                </div>
+                <span class="text-xs font-bold rounded-full px-3 py-1 whitespace-nowrap" :class="statusOf(m).cls" x-text="statusOf(m).label"></span>
+              </div>
+              <div class="grid grid-cols-3 gap-2 text-sm text-center">
+                <div class="bg-orange-50 rounded-xl p-2"><span class="lbl" x-text="t('cycle_short')"></span><b x-text="t('every_n',{n:m.cycle})"></b></div>
+                <div class="bg-orange-50 rounded-xl p-2"><span class="lbl" x-text="t('last')"></span><b x-text="m.last"></b></div>
+                <div class="bg-orange-50 rounded-xl p-2"><span class="lbl" x-text="t('next')"></span><b x-text="nextDate(m)"></b></div>
+              </div>
+              <div class="text-sm text-stone-500" x-text="statusOf(m).detail"></div>
+              <div class="flex gap-2 flex-wrap">
+                <button class="btn btn-green" @click="markFed(m)" x-text="t('fed_today')"></button>
+                <button class="btn btn-soft" @click="editMed(m)" x-text="t('edit')"></button>
+                <button class="btn btn-soft" @click="delMed(m.id)" x-text="t('delete')"></button>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- ---- 3b. 用藥紀錄（處方／保健品） ---- -->
+        <div x-show="msub==='rx'" class="space-y-4">
+          <form class="card p-5 space-y-3" @submit.prevent="saveRx()">
+            <h3 class="font-extrabold text-lg" x-text="rxForm.id ? '✏️ ' + t('rx_edit_title') : '💊 ' + t('rx_add_title')"></h3>
+            <div>
+              <label class="lbl" x-text="t('rx_name')"></label>
+              <input class="inp" required x-model="rxForm.name" :placeholder="t('ph_rxname')">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="lbl" x-text="t('rx_kind')"></label>
+                <select class="inp" x-model="rxForm.kind">
+                  <option value="rx" x-text="t('k_rx')"></option>
+                  <option value="supp" x-text="t('k_supp')"></option>
+                </select>
+              </div>
+              <div>
+                <label class="lbl" x-text="t('rx_start')"></label>
+                <input type="date" class="inp" required x-model="rxForm.start">
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="lbl" x-text="t('rx_dose')"></label><input class="inp" x-model="rxForm.dose" :placeholder="t('ph_dose')"></div>
+              <div><label class="lbl" x-text="t('rx_freq')"></label><input class="inp" x-model="rxForm.freq" :placeholder="t('ph_freq')"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="lbl" x-text="t('rx_days')"></label><input type="number" min="1" inputmode="numeric" class="inp" x-model="rxForm.days" :placeholder="t('ph_days')"></div>
+              <div><label class="lbl" x-text="t('rx_doctor')"></label><input class="inp" x-model="rxForm.doctor" :placeholder="t('ph_rxdoc')"></div>
+            </div>
+            <div><label class="lbl" x-text="t('rx_reason')"></label><input class="inp" x-model="rxForm.reason" :placeholder="t('ph_reason')"></div>
+            <div><label class="lbl" x-text="t('note')"></label><textarea rows="2" class="inp" x-model="rxForm.note"></textarea></div>
+
+            <div x-show="hasDays(rxForm.days)" class="bg-orange-50 rounded-2xl p-3 space-y-2">
+              <label class="flex items-center gap-2 text-sm font-bold">
+                <input type="checkbox" class="w-5 h-5" x-model="rxForm.remind">
+                <span x-text="t('rx_remind')"></span>
+              </label>
+              <div x-show="rxForm.remind" class="flex items-center gap-2 text-sm">
+                <span x-text="t('rx_remind_days')"></span>
+                <input type="number" min="0" inputmode="numeric" class="inp !w-20 !py-1" x-model="rxForm.remindDays">
+                <span x-text="t('days_unit')"></span>
+              </div>
+            </div>
+
+            <div>
+              <label class="lbl" x-text="t('photos')"></label>
+              <div class="flex flex-wrap gap-2 mb-2">
+                <template x-for="f in rxForm.files" :key="f.id">
+                  <div class="relative w-16 h-16 rounded-xl overflow-hidden bg-orange-50 border border-orange-100 flex items-center justify-center">
+                    <template x-if="src(f.id)"><img :src="src(f.id)" class="w-full h-full object-cover"></template>
+                    <template x-if="!src(f.id)"><span>📷</span></template>
+                    <button type="button" class="absolute top-0 right-0 bg-black/50 text-white text-xs w-5 h-5 rounded-bl-lg" @click="removeFile(rxForm, f)">✕</button>
+                  </div>
+                </template>
+              </div>
+              <input type="file" accept="image/*" multiple class="text-sm" @change="addFiles(rxForm, $event, false)">
+              <p class="text-xs text-stone-400 mt-1" x-text="t('hint_photos')"></p>
+            </div>
+
+            <div class="flex gap-2">
+              <button class="btn btn-main flex-1" type="submit" x-text="rxForm.id ? t('save_changes') : t('add')"></button>
+              <button type="button" class="btn btn-soft" x-show="rxForm.id" @click="cancelRx()" x-text="t('cancel')"></button>
+            </div>
+          </form>
+
+          <p class="text-center text-stone-400 py-4" x-show="!pet.rx.length" x-text="t('no_rx')"></p>
+
+          <h3 class="font-extrabold px-1" x-show="rxActive.length" x-text="'🟢 ' + t('rx_active')"></h3>
+          <template x-for="r in rxActive" :key="r.id">
+            <div class="card p-4 space-y-3">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <span class="text-xs rounded-full px-2 py-0.5 font-bold" :class="r.kind==='supp' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-500'" x-text="lbl('k_', r.kind)"></span>
+                  <h4 class="font-extrabold text-lg mt-1" x-text="r.name"></h4>
+                </div>
+                <span class="text-xs font-bold rounded-full px-3 py-1 whitespace-nowrap" :class="rxStatus(r).cls" x-text="rxStatus(r).label"></span>
+              </div>
+              <div class="grid grid-cols-2 gap-2 text-sm">
+                <div class="bg-orange-50 rounded-xl p-2" x-show="r.dose"><span class="lbl" x-text="t('rx_dose')"></span><b x-text="r.dose"></b></div>
+                <div class="bg-orange-50 rounded-xl p-2" x-show="r.freq"><span class="lbl" x-text="t('rx_freq')"></span><b x-text="r.freq"></b></div>
+                <div class="bg-orange-50 rounded-xl p-2"><span class="lbl" x-text="t('rx_start')"></span><b x-text="r.start"></b></div>
+                <div class="bg-orange-50 rounded-xl p-2" x-show="rxLast(r)"><span class="lbl" x-text="t('rx_last')"></span><b x-text="rxLast(r)"></b></div>
+              </div>
+              <div class="text-sm text-stone-500" x-show="rxStatus(r).detail" x-text="rxStatus(r).detail"></div>
+              <p class="text-sm" x-show="r.reason" x-text="t('rx_reason_l') + r.reason"></p>
+              <p class="text-sm" x-show="r.doctor" x-text="t('rx_doctor_l') + r.doctor"></p>
+              <p class="text-sm text-stone-500 whitespace-pre-wrap" x-show="r.note" x-text="r.note"></p>
+
+              <div class="flex flex-wrap gap-2" x-show="(r.files||[]).length">
+                <template x-for="f in (r.files||[])" :key="f.id">
+                  <button type="button" class="w-16 h-16 rounded-xl overflow-hidden bg-orange-50 border border-orange-100 flex items-center justify-center text-xs font-bold text-orange-500" @click="openFile(f)">
+                    <template x-if="src(f.id)"><img :src="src(f.id)" class="w-full h-full object-cover"></template>
+                    <template x-if="!src(f.id)"><span>📷</span></template>
+                  </button>
+                </template>
+              </div>
+
+              <div class="flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-green" x-show="r.days" @click="r.remind = !r.remind" x-text="r.remind ? t('rx_remind_on') : t('rx_remind_off')"></button>
+                <button type="button" class="btn btn-soft" @click="editRx(r)" x-text="t('edit')"></button>
+                <button type="button" class="btn btn-soft" @click="delRx(r.id)" x-text="t('delete')"></button>
+              </div>
+            </div>
+          </template>
+
+          <h3 class="font-extrabold px-1" x-show="rxEnded.length" x-text="'⚪ ' + t('rx_ended')"></h3>
+          <template x-for="r in rxEnded" :key="r.id">
+            <div class="card p-4 space-y-3 opacity-90">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <span class="text-xs rounded-full px-2 py-0.5 font-bold" :class="r.kind==='supp' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-500'" x-text="lbl('k_', r.kind)"></span>
+                  <h4 class="font-extrabold text-lg mt-1" x-text="r.name"></h4>
+                </div>
+                <span class="text-xs font-bold rounded-full px-3 py-1 whitespace-nowrap" :class="rxStatus(r).cls" x-text="rxStatus(r).label"></span>
+              </div>
+              <div class="grid grid-cols-2 gap-2 text-sm">
+                <div class="bg-orange-50 rounded-xl p-2" x-show="r.dose"><span class="lbl" x-text="t('rx_dose')"></span><b x-text="r.dose"></b></div>
+                <div class="bg-orange-50 rounded-xl p-2" x-show="r.freq"><span class="lbl" x-text="t('rx_freq')"></span><b x-text="r.freq"></b></div>
+                <div class="bg-orange-50 rounded-xl p-2"><span class="lbl" x-text="t('rx_start')"></span><b x-text="r.start"></b></div>
+                <div class="bg-orange-50 rounded-xl p-2"><span class="lbl" x-text="t('rx_last')"></span><b x-text="rxLast(r)"></b></div>
+              </div>
+              <div class="text-sm text-stone-500" x-text="rxStatus(r).detail"></div>
+              <p class="text-sm" x-show="r.reason" x-text="t('rx_reason_l') + r.reason"></p>
+              <p class="text-sm" x-show="r.doctor" x-text="t('rx_doctor_l') + r.doctor"></p>
+              <p class="text-sm text-stone-500 whitespace-pre-wrap" x-show="r.note" x-text="r.note"></p>
+
+              <div class="flex flex-wrap gap-2" x-show="(r.files||[]).length">
+                <template x-for="f in (r.files||[])" :key="f.id">
+                  <button type="button" class="w-16 h-16 rounded-xl overflow-hidden bg-orange-50 border border-orange-100 flex items-center justify-center text-xs font-bold text-orange-500" @click="openFile(f)">
+                    <template x-if="src(f.id)"><img :src="src(f.id)" class="w-full h-full object-cover"></template>
+                    <template x-if="!src(f.id)"><span>📷</span></template>
+                  </button>
+                </template>
+              </div>
+
+              <div class="flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-soft" @click="editRx(r)" x-text="t('edit')"></button>
+                <button type="button" class="btn btn-soft" @click="delRx(r.id)" x-text="t('delete')"></button>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- ---- 3c. 檢查報告 ---- -->
+        <div x-show="msub==='reports'" class="space-y-4">
+          <form class="card p-5 space-y-3" @submit.prevent="saveReport()">
+            <h3 class="font-extrabold text-lg" x-text="rpForm.id ? '✏️ ' + t('rp_edit_title') : '🔬 ' + t('rp_add_title')"></h3>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="lbl" x-text="t('rp_type')"></label>
+                <select class="inp" x-model="rpForm.type">
+                  <template x-for="rt in reportTypes" :key="rt"><option :value="rt" x-text="reportIcon(rt) + ' ' + lbl('rt_', rt)"></option></template>
+                </select>
+              </div>
+              <div><label class="lbl" x-text="t('date')"></label><input type="date" class="inp" required x-model="rpForm.date"></div>
+            </div>
+            <div><label class="lbl" x-text="t('rp_clinic')"></label><input class="inp" x-model="rpForm.clinic"></div>
+            <div><label class="lbl" x-text="t('rp_summary')"></label><textarea rows="3" class="inp" x-model="rpForm.summary" :placeholder="t('ph_summary')"></textarea></div>
+            <div><label class="lbl" x-text="t('rp_opinion')"></label><textarea rows="2" class="inp" x-model="rpForm.opinion" :placeholder="t('ph_opinion')"></textarea></div>
+
+            <div>
+              <label class="lbl" x-text="t('files_lbl')"></label>
+              <div class="flex flex-wrap gap-2 mb-2">
+                <template x-for="f in rpForm.files" :key="f.id">
+                  <div class="relative w-16 h-16 rounded-xl overflow-hidden bg-orange-50 border border-orange-100 flex items-center justify-center">
+                    <template x-if="f.type==='application/pdf'"><span class="text-xs font-bold text-orange-500">PDF</span></template>
+                    <template x-if="f.type!=='application/pdf' && src(f.id)"><img :src="src(f.id)" class="w-full h-full object-cover"></template>
+                    <template x-if="f.type!=='application/pdf' && !src(f.id)"><span>📷</span></template>
+                    <button type="button" class="absolute top-0 right-0 bg-black/50 text-white text-xs w-5 h-5 rounded-bl-lg" @click="removeFile(rpForm, f)">✕</button>
+                  </div>
+                </template>
+              </div>
+              <input type="file" accept="image/*,application/pdf" multiple class="text-sm" @change="addFiles(rpForm, $event, true)">
+              <p class="text-xs text-stone-400 mt-1" x-text="t('hint_files')"></p>
+            </div>
+
+            <div class="flex gap-2">
+              <button class="btn btn-main flex-1" type="submit" x-text="rpForm.id ? t('save_changes') : t('add')"></button>
+              <button type="button" class="btn btn-soft" x-show="rpForm.id" @click="cancelReport()" x-text="t('cancel')"></button>
+            </div>
+          </form>
+
+          <p class="text-center text-stone-400 py-4" x-show="!pet.reports.length" x-text="t('no_reports')"></p>
+          <template x-for="r in reportsSorted" :key="r.id">
+            <div class="card p-4 space-y-3">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <div class="flex items-center gap-2"><span class="text-xl" x-text="reportIcon(r.type)"></span><b x-text="lbl('rt_', r.type)"></b></div>
+                  <div class="text-xs text-stone-400" x-text="r.date + (r.clinic ? ' · ' + r.clinic : '')"></div>
+                </div>
+              </div>
+              <div x-show="r.summary">
+                <span class="lbl" x-text="t('rp_summary')"></span>
+                <p class="text-sm whitespace-pre-wrap" x-text="r.summary"></p>
+              </div>
+              <div x-show="r.opinion">
+                <span class="lbl" x-text="t('rp_opinion')"></span>
+                <p class="text-sm whitespace-pre-wrap" x-text="r.opinion"></p>
+              </div>
+
+              <div class="flex flex-wrap gap-2" x-show="(r.files||[]).length">
+                <template x-for="f in (r.files||[])" :key="f.id">
+                  <button type="button" class="w-16 h-16 rounded-xl overflow-hidden bg-orange-50 border border-orange-100 flex items-center justify-center text-xs font-bold text-orange-500" @click="openFile(f)">
+                    <template x-if="f.type==='application/pdf'"><span>📄 PDF</span></template>
+                    <template x-if="f.type!=='application/pdf' && src(f.id)"><img :src="src(f.id)" class="w-full h-full object-cover"></template>
+                    <template x-if="f.type!=='application/pdf' && !src(f.id)"><span>📷</span></template>
+                  </button>
+                </template>
+              </div>
+
+              <div class="flex gap-2">
+                <button type="button" class="btn btn-soft" @click="editReport(r)" x-text="t('edit')"></button>
+                <button type="button" class="btn btn-soft" @click="delReport(r.id)" x-text="t('delete')"></button>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- ---- 3d. 疫苗 ---- -->
+        <div x-show="msub==='vaccine'" class="space-y-4">
+          <form class="card p-5 space-y-3" @submit.prevent="saveVaccine()">
+            <h3 class="font-extrabold text-lg" x-text="'💉 ' + t('vax_title')"></h3>
+            <div>
+              <label class="lbl" x-text="t('vax_name')"></label>
+              <input class="inp" list="vaccList" required x-model="vForm.name" :placeholder="t('eg') + (vaccSuggest[0] || '')">
+              <datalist id="vaccList"><template x-for="sv in vaccSuggest" :key="sv"><option :value="sv"></option></template></datalist>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="lbl" x-text="t('vax_date')"></label><input type="date" class="inp" required x-model="vForm.date"></div>
+              <div><label class="lbl" x-text="t('vax_next')"></label><input type="date" class="inp" x-model="vForm.next"></div>
+            </div>
+            <button class="btn btn-main w-full" type="submit" x-text="t('add_vax')"></button>
+          </form>
+
+          <template x-for="v in [...pet.vaccines].sort((a,b)=>b.date.localeCompare(a.date))" :key="v.id">
+            <div class="card p-4 flex items-center justify-between gap-2">
+              <div>
+                <b x-text="'💉 '+v.name"></b>
+                <div class="text-sm text-stone-500" x-text="t('vax_given') + v.date"></div>
+                <div class="text-sm" x-show="v.next">
+                  <span x-text="t('vax_nextl') + v.next"></span>
+                  <span class="text-xs font-bold rounded-full px-2 py-0.5 ml-1" :class="vStatus(v).cls" x-text="vStatus(v).label"></span>
+                </div>
+              </div>
+              <button class="btn btn-soft !px-3 !py-1 text-sm" @click="delVaccine(v.id)" x-text="t('delete')"></button>
+            </div>
+          </template>
+        </div>
+
+        <!-- ---- 3e. 異常事件 ---- -->
+        <div x-show="msub==='events'" class="space-y-4">
+          <form class="card p-5 space-y-3" @submit.prevent="saveEvent()">
+            <h3 class="font-extrabold text-lg" x-text="'📝 ' + t('ev_title')"></h3>
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="lbl" x-text="t('date')"></label><input type="date" class="inp" required x-model="eForm.date"></div>
+              <div>
+                <label class="lbl" x-text="t('type')"></label>
+                <select class="inp" x-model="eForm.type">
+                  <template x-for="et in eventTypes" :key="et"><option :value="et" x-text="lbl('et_', et)"></option></template>
+                </select>
+              </div>
+            </div>
+            <div><label class="lbl" x-text="t('desc')"></label><textarea rows="2" class="inp" x-model="eForm.note" :placeholder="t('ph_ev')"></textarea></div>
+            <button class="btn btn-main w-full" type="submit" x-text="t('add_ev')"></button>
+          </form>
+
+          <template x-for="e in [...pet.events].sort((a,b)=>b.date.localeCompare(a.date))" :key="e.id">
+            <div class="card p-4 flex items-start justify-between gap-2">
+              <div>
+                <div class="flex items-center gap-2"><span class="text-xl" x-text="eventIcon(e.type)"></span><b x-text="lbl('et_', e.type)"></b></div>
+                <div class="text-xs text-stone-400" x-text="e.date"></div>
+                <p class="text-sm mt-1 whitespace-pre-wrap" x-text="e.note"></p>
+              </div>
+              <button class="btn btn-soft !px-3 !py-1 text-sm" @click="delEvent(e.id)" x-text="t('delete')"></button>
+            </div>
+          </template>
+          <p class="text-center text-stone-400 py-2" x-show="!pet.events.length" x-text="t('no_events')"></p>
+        </div>
+      </section>
+
+      <!-- ========== 4. 生活 ========== -->
+      <section x-show="tab==='life'" class="space-y-4">
+        <form class="card p-5 space-y-3" @submit.prevent="saveLife()">
+          <h3 class="font-extrabold text-lg" x-text="'📘 ' + t('life_title')"></h3>
+          <p class="text-xs text-stone-400 mb-2" x-text="t('life_hint')"></p>
+          <div class="grid grid-cols-2 gap-3">
+            <div><label class="lbl" x-text="t('date')"></label><input type="date" class="inp" required x-model="lForm.date"></div>
+            <div>
+              <label class="lbl" x-text="t('category')"></label>
+              <select class="inp" x-model="lForm.type">
+                <template x-for="lt in lifeTypes" :key="lt"><option :value="lt" x-text="lbl('lt_', lt)"></option></template>
+              </select>
+            </div>
+          </div>
+          <div><label class="lbl" x-text="t('content')"></label><textarea rows="2" class="inp" required x-model="lForm.note" :placeholder="t('ph_life')"></textarea></div>
+
+          <div>
+            <label class="lbl" x-text="t('photos')"></label>
+            <div class="flex flex-wrap gap-2 mb-2">
+              <template x-for="f in lForm.files" :key="f.id">
+                <div class="relative w-16 h-16 rounded-xl overflow-hidden bg-orange-50 border border-orange-100 flex items-center justify-center">
+                  <template x-if="src(f.id)"><img :src="src(f.id)" class="w-full h-full object-cover"></template>
+                  <template x-if="!src(f.id)"><span>📷</span></template>
+                  <button type="button" class="absolute top-0 right-0 bg-black/50 text-white text-xs w-5 h-5 rounded-bl-lg" @click="removeFile(lForm, f)">✕</button>
+                </div>
+              </template>
+            </div>
+            <input type="file" accept="image/*" multiple class="text-sm" @change="addFiles(lForm, $event, false)">
+            <p class="text-xs text-stone-400 mt-1" x-text="t('hint_photos')"></p>
+          </div>
+
+          <button class="btn btn-main w-full" type="submit" x-text="t('add_life')"></button>
+        </form>
+
+        <template x-for="l in [...pet.lifeLogs].sort((a,b)=>b.date.localeCompare(a.date))" :key="l.id">
+          <div class="card p-4 space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <span class="bg-orange-100 text-orange-600 px-2 py-0.5 rounded text-xs font-bold" x-text="lbl('lt_', l.type)"></span>
+                <div class="text-xs text-stone-400 mt-1" x-text="l.date"></div>
+                <p class="text-sm mt-1 whitespace-pre-wrap" x-text="l.note"></p>
+              </div>
+              <button class="btn btn-soft !px-3 !py-1 text-sm" @click="delLife(l.id)" x-text="t('delete')"></button>
+            </div>
+            <div class="flex flex-wrap gap-2" x-show="(l.files||[]).length">
+              <template x-for="f in (l.files||[])" :key="f.id">
+                <button type="button" class="w-16 h-16 rounded-xl overflow-hidden bg-orange-50 border border-orange-100 flex items-center justify-center text-xs font-bold text-orange-500" @click="openFile(f)">
+                  <template x-if="src(f.id)"><img :src="src(f.id)" class="w-full h-full object-cover"></template>
+                  <template x-if="!src(f.id)"><span>📷</span></template>
+                </button>
+              </template>
+            </div>
+          </div>
+        </template>
+        <p class="text-center text-stone-400 py-2" x-show="!pet.lifeLogs.length" x-text="t('no_life')"></p>
+      </section>
+
+      <!-- ========== 5. 更多（診所、備份） ========== -->
+      <section x-show="tab==='more'" class="space-y-4">
+
+        <!-- 主診診所 -->
+        <div class="card p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="font-extrabold text-lg" x-text="'🏥 ' + t('clinic_title')"></h3>
+            <button class="btn btn-soft !py-1 text-sm" @click="clinicEdit=!clinicEdit" x-text="clinicEdit ? t('done') : t('edit')"></button>
+          </div>
+          <template x-if="!clinicEdit">
+            <div class="space-y-1 text-sm">
+              <p><span class="lbl inline" x-text="t('clinic_l')"></span><b x-text="pet.clinic.name || '—'"></b></p>
+              <p><span class="lbl inline" x-text="t('vet_l')"></span><b x-text="pet.clinic.vet || '—'"></b></p>
+              <p><span class="lbl inline" x-text="t('phone_l')"></span>
+                <template x-if="pet.clinic.phone"><a class="font-bold text-orange-500 underline" :href="'tel:'+pet.clinic.phone" x-text="pet.clinic.phone"></a></template>
+                <template x-if="!pet.clinic.phone"><b>—</b></template></p>
+              <p><span class="lbl inline" x-text="t('address_l')"></span><b x-text="pet.clinic.address || '—'"></b></p>
+            </div>
+          </template>
+          <template x-if="clinicEdit">
+            <div class="space-y-2">
+              <input class="inp" :placeholder="t('ph_clinic')" x-model="pet.clinic.name">
+              <input class="inp" :placeholder="t('ph_vet')" x-model="pet.clinic.vet">
+              <input class="inp" type="tel" :placeholder="t('ph_phone')" x-model="pet.clinic.phone">
+              <input class="inp" :placeholder="t('ph_address')" x-model="pet.clinic.address">
+            </div>
+          </template>
+        </div>
+
+        <!-- 診所通訊錄 -->
+        <form class="card p-5 space-y-3" @submit.prevent="saveVet()">
+          <h3 class="font-extrabold text-lg" x-text="'📒 ' + t('vets_title')"></h3>
+          <div><label class="lbl" x-text="t('clinic_name')"></label><input class="inp" required x-model="vetForm.name" :placeholder="t('ph_vetname')"></div>
+          <div class="grid grid-cols-2 gap-3">
+            <div><label class="lbl" x-text="t('doctor')"></label><input class="inp" x-model="vetForm.doctor" :placeholder="t('optional')"></div>
+            <div><label class="lbl" x-text="t('phone_lbl')"></label><input type="tel" class="inp" x-model="vetForm.phone" :placeholder="t('optional')"></div>
+          </div>
+          <div><label class="lbl" x-text="t('addr_note')"></label><input class="inp" x-model="vetForm.note" :placeholder="t('ph_note')"></div>
+          <button class="btn btn-main w-full" type="submit" x-text="t('add_clinic')"></button>
+        </form>
+
+        <template x-for="v in pet.vets" :key="v.id">
+          <div class="card p-4 flex items-start justify-between gap-2 border-l-4 border-orange-300">
+            <div>
+              <b class="text-lg text-stone-700" x-text="v.name"></b>
+              <div class="text-sm text-stone-600 mt-1" x-show="v.doctor" x-text="t('doctor_prefix') + v.doctor"></div>
+              <div class="text-sm mt-1" x-show="v.phone"><a class="font-bold text-orange-500 underline" :href="'tel:'+v.phone" x-text="'📞 ' + v.phone"></a></div>
+              <div class="text-xs text-stone-400 mt-1" x-show="v.note" x-text="'📍 ' + v.note"></div>
+            </div>
+            <button class="btn btn-soft !px-3 !py-1 text-sm" @click="delVet(v.id)" x-text="t('delete')"></button>
+          </div>
+        </template>
+        <p class="text-center text-stone-400 py-2" x-show="!pet.vets.length" x-text="t('no_clinics')"></p>
+
+        <!-- 完整備份（連相片） -->
+        <div class="card p-5 space-y-3">
+          <h3 class="font-extrabold text-lg" x-text="'📦 ' + t('full_title')"></h3>
+          <p class="text-sm" style="color:#a08a80" x-text="t('full_desc')"></p>
+          <div class="flex gap-2 flex-wrap">
+            <button type="button" class="btn btn-main" @click="exportFull()" x-text="t('export_full')"></button>
+            <label class="btn btn-soft cursor-pointer">
+              <span x-text="t('import_full')"></span>
+              <input type="file" accept=".json,application/json" class="hidden" @change="importFull($event)">
+            </label>
+          </div>
+        </div>
+
+        <!-- 文字備份碼 -->
+        <div class="card p-5 space-y-3">
+          <h3 class="font-extrabold text-lg" x-text="'💾 ' + t('backup_title')"></h3>
+          <p class="text-sm" style="color:#a08a80" x-text="t('backup_desc')"></p>
+          <textarea id="backupBox" rows="3" class="inp text-xs" x-model="backupText" :placeholder="t('backup_ph')"></textarea>
+          <div class="flex gap-2 flex-wrap">
+            <button type="button" class="btn btn-main" @click="copyBackup()" x-text="t('copy_backup')"></button>
+            <button type="button" class="btn btn-soft" @click="restoreBackup()" x-text="t('restore_backup')"></button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+    </template>
+  </main>
+
+  <!-- 底部導覽 -->
+  <nav class="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur border-t border-orange-100 z-30" style="padding-bottom:env(safe-area-inset-bottom)">
+    <div class="max-w-2xl mx-auto grid grid-cols-5 text-xs font-bold text-stone-400">
+      <template x-for="tb in tabs" :key="tb.id">
+        <button class="tabbtn py-2 flex flex-col items-center gap-0.5" :class="tab===tb.id && 'active'" @click="tab=tb.id">
+          <span class="ico w-10 h-7 rounded-full flex items-center justify-center text-lg" x-text="tb.icon"></span>
+          <span x-text="t('tab_'+tb.id)"></span>
+        </button>
+      </template>
+    </div>
+  </nav>
+
+  <!-- 寵物資料 Modal -->
+  <div class="fixed inset-0 z-40 bg-black/30 flex items-end sm:items-center justify-center p-0 sm:p-4" x-show="petModal" x-transition.opacity @click.self="petModal=false">
+    <form class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 space-y-3 max-h-[92vh] overflow-y-auto" @submit.prevent="savePet()">
+      <h3 class="font-extrabold text-lg" x-text="cForm.id ? '✏️ ' + t('m_edit') : '🐾 ' + t('m_new')"></h3>
+      <div class="flex items-center gap-3">
+        <div class="w-20 h-20 rounded-full bg-orange-100 border-4 border-orange-200 overflow-hidden flex items-center justify-center text-3xl shrink-0">
+          <template x-if="cForm.photo"><img :src="cForm.photo" class="w-full h-full object-cover"></template>
+          <template x-if="!cForm.photo"><span x-text="speciesIcon(cForm.species)"></span></template>
+        </div>
+        <div class="space-y-1">
+          <input type="file" accept="image/*" class="text-sm" @change="pickPhoto($event)">
+          <button type="button" class="text-xs text-orange-500 underline" x-show="cForm.photo" @click="cForm.photo=''" x-text="t('remove_photo')"></button>
+        </div>
+      </div>
+      <div><label class="lbl" x-text="t('name')"></label><input class="inp" required x-model="cForm.name" :placeholder="t('ph_name')"></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="lbl" x-text="t('species')"></label>
+          <select class="inp" x-model="cForm.species">
+            <template x-for="sp in speciesList" :key="sp"><option :value="sp" x-text="speciesIcon(sp) + ' ' + lbl('sp_', sp)"></option></template>
+          </select>
+        </div>
+        <div>
+          <label class="lbl" x-text="t('gender')"></label>
+          <select class="inp" x-model="cForm.gender">
+            <template x-for="g in genderList" :key="g"><option :value="g" x-text="g ? lbl('g_', g) : t('g_unspecified')"></option></template>
+          </select>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="lbl" x-text="t('birth')"></label><input type="date" class="inp" x-model="cForm.birth"></div>
+        <div><label class="lbl" x-text="t('breed')"></label><input class="inp" x-model="cForm.breed" :placeholder="t('ph_breed')"></div>
+      </div>
+      <div><label class="lbl" x-text="t('chip')"></label><input class="inp" inputmode="numeric" x-model="cForm.chip" :placeholder="t('ph_chip')"></div>
+      <div class="flex gap-2 pt-1">
+        <button class="btn btn-main flex-1" type="submit" x-text="t('save')"></button>
+        <button type="button" class="btn btn-soft" @click="petModal=false" x-text="t('cancel')"></button>
+      </div>
+      <button type="button" class="w-full text-sm text-red-400 underline pt-1" x-show="cForm.id" @click="delPet()" x-text="t('del_pet')"></button>
+    </form>
+  </div>
+
+  <!-- 確認視窗 -->
+  <div class="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" x-show="confirmBox" x-transition.opacity @click.self="confirmBox=null">
+    <div class="bg-white rounded-3xl p-5 w-full max-w-sm space-y-4 text-center" style="color:var(--fg)">
+      <div class="text-4xl">🐾</div>
+      <p class="font-bold" x-text="confirmBox ? confirmBox.msg : ''"></p>
+      <div class="flex gap-2">
+        <button type="button" class="btn btn-soft flex-1" @click="confirmBox=null" x-text="t('cancel')"></button>
+        <button type="button" class="btn btn-main flex-1" @click="yes()" x-text="t('ok')"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 相片放大 -->
+  <div class="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-3" x-show="lightbox" x-transition.opacity @click="lightbox=null">
+    <img :src="lightbox ? src(lightbox) : null" class="max-w-full max-h-full object-contain rounded-lg">
+    <button type="button" class="absolute top-4 right-4 bg-white/90 text-stone-700 rounded-full w-10 h-10 font-bold" @click.stop="lightbox=null" :aria-label="t('close')">✕</button>
+  </div>
+
+  <div class="fixed left-1/2 -translate-x-1/2 z-[70] rounded-full px-4 py-2 text-sm font-bold shadow-lg max-w-[90vw] text-center" style="bottom:5.5rem;background:var(--fg);color:#fff" x-show="toastMsg" x-transition x-text="toastMsg"></div>
+</div>
+
+<script>
+// 儲存 key 與舊版相同，所以舊資料會自動沿用
+const KEY = 'catHealthTracker_standalone_v1';
+const LANG_KEY = 'petTracker_lang';
+const UNIT_KEY = 'petTracker_unit';
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+// 圖表放喺 Alpine 外面，避免被 Alpine 包成 Proxy 而畫唔出
+let weightChart = null;
+
+const MAX_FILES = 10;                 // 每項紀錄最多檔案數
+const MAX_PDF = 5 * 1024 * 1024;      // PDF 上限 5MB
+const requested = new Set();          // 已經開始載入嘅檔案 id
+
+/* ---------- IndexedDB（相片／PDF 儲存） ---------- */
+const DB_NAME = 'petTrackerFiles', STORE = 'files';
+let dbPromise = null;
+function openDB() {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((res, rej) => {
+    const r = indexedDB.open(DB_NAME, 1);
+    r.onupgradeneeded = () => r.result.createObjectStore(STORE, { keyPath: 'id' });
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+  return dbPromise;
+}
+async function idbPut(rec) {
+  const db = await openDB();
+  return new Promise((res, rej) => { const tx = db.transaction(STORE, 'readwrite'); tx.objectStore(STORE).put(rec); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
+}
+async function idbGet(id) {
+  const db = await openDB();
+  return new Promise((res, rej) => { const q = db.transaction(STORE).objectStore(STORE).get(id); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
+}
+async function idbDel(id) {
+  const db = await openDB();
+  return new Promise((res, rej) => { const tx = db.transaction(STORE, 'readwrite'); tx.objectStore(STORE).delete(id); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
+}
+async function idbAll() {
+  const db = await openDB();
+  return new Promise((res, rej) => { const q = db.transaction(STORE).objectStore(STORE).getAll(); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
+}
+async function idbClear() {
+  const db = await openDB();
+  return new Promise((res, rej) => { const tx = db.transaction(STORE, 'readwrite'); tx.objectStore(STORE).clear(); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
+}
+
+/* ---------- 檔案工具 ---------- */
+function readAsDataURL(file) {
+  return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(file); });
+}
+function compressImage(file, max = 1200, q = 0.8) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onerror = () => rej(r.error);
+    r.onload = e => {
+      const img = new Image();
+      img.onerror = () => rej(new Error('img'));
+      img.onload = () => {
+        const s = Math.min(1, max / Math.max(img.width, img.height));
+        const w = Math.round(img.width * s), h = Math.round(img.height * s);
+        const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        const ctx = cv.getContext('2d');
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        res(cv.toDataURL('image/jpeg', q));
+      };
+      img.src = e.target.result;
+    };
+    r.readAsDataURL(file);
+  });
+}
+function dataUrlToBlob(u) {
+  const parts = u.split(','), mime = (parts[0].match(/:(.*?);/) || [])[1] || 'application/octet-stream';
+  const bin = atob(parts[1]), arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+
+// 舊版中文資料 → 新版通用代碼（自動轉換，唔會遺失資料）
+const LEGACY = {
+  '杜虱/防虱藥': 'flea', '心絲蟲藥': 'heartworm', '體內杜蟲藥': 'dewormer', '長期慢性病藥物': 'chronic',
+  '嘔吐': 'vomit', '軟便/腹瀉': 'diarrhea', '食慾不振': 'appetite', '精神不佳': 'lethargy', '咳嗽/打噴嚏': 'cough', '其他': 'other',
+  '飲食': 'diet', '行為': 'behavior', '情緒': 'mood', '環境': 'env',
+  '男生': 'male', '女生': 'female', '男生（已絕育）': 'male_n', '女生（已絕育）': 'female_n',
+};
+const norm = v => LEGACY[v] || v;
+
+// 疫苗建議（只係輸入建議，仍可自由輸入）
+const VACC = {
+  cat:    { zh: ['三合一', '四合一', '狂犬病', '貓白血病'], en: ['FVRCP', 'Rabies', 'FeLV'] },
+  dog:    { zh: ['多合一 (DHPP)', '狂犬病', '犬舍咳 (Bordetella)', '鈎端螺旋體'], en: ['DHPP', 'Rabies', 'Bordetella', 'Leptospirosis'] },
+  rabbit: { zh: ['黏液瘤病', '兔出血症 (RHD)'], en: ['Myxomatosis', 'RHD'] },
+  other:  { zh: ['狂犬病'], en: ['Rabies'] },
+};
+
+const I18N = {
+  zh: {
+    app_title: '寵物健康記錄器', saved_note: '📱 資料已自動儲存在手機本機 (獨立 App 模式)',
+    tab_home: '主頁', tab_weight: '體重', tab_medical: '醫療', tab_life: '生活', tab_more: '更多',
+    sub_care: '驅蟲提醒', sub_rx: '用藥', sub_reports: '檢查報告', sub_vaccine: '疫苗', sub_events: '異常事件',
+    no_pet: '還沒有寵物資料，先來新增一位家人吧！', add_pet: '＋ 新增寵物', load_demo: '載入範例資料',
+    edit: '編輯', delete: '刪除', cancel: '取消', ok: '確定', save: '儲存', add: '新增', done: '完成', save_changes: '儲存修改', close: '關閉',
+    birth: '出生日期', gender: '性別', species: '物種', breed: '品種', chip: '晶片號碼', eg: '例如：',
+    sp_cat: '貓', sp_dog: '狗', sp_rabbit: '兔', sp_other: '其他',
+    g_unspecified: '未填寫', g_male: '公', g_female: '母', g_male_n: '公（已絕育）', g_female_n: '母（已絕育）',
+    latest_weight: '最近體重', no_record: '尚無紀錄', next_med: '下次驅蟲/藥物', next_vax: '下次打針',
+    backup_title: '文字備份碼', backup_desc: '只包含文字紀錄，不包含相片和檔案。要連相片一起備份，請用上面的「完整備份」。',
+    backup_ph: '備份碼會顯示在這裡；還原時把備份碼貼在這裡', copy_backup: '複製備份碼', restore_backup: '從備份碼還原',
+    full_title: '完整備份（連相片／檔案）', full_desc: '匯出成一個檔案，換手機或定期備份時使用。匯入會取代目前所有資料。',
+    export_full: '匯出完整備份檔', import_full: '匯入備份檔',
+    med_edit_title: '編輯驅蟲／預防藥', med_add_title: '新增驅蟲／預防藥', med_type: '藥物類型',
+    mt_flea: '杜虱/防虱藥', mt_heartworm: '心絲蟲藥', mt_dewormer: '體內杜蟲藥', mt_chronic: '長期慢性病藥物',
+    med_name: '藥物名稱（如 Revolution、Bravecto）', ph_med: '例如：Revolution',
+    cycle: '服藥週期', every_n: '每 {n} 天', custom_days: '自訂天數', last_dose: '上次服藥日期', custom_cycle: '自訂週期（天）', ph_custom: '例如：14',
+    no_meds: '還沒有藥物紀錄 🐟', cycle_short: '週期', last: '上次', next: '下次', fed_today: '✅ 今日已餵藥',
+    st_over: '🔴 已逾期', st_soon: '🟡 即將到期', st_ok: '🟢 正常',
+    d_over: '已逾期 {n} 天，請盡快餵藥！', d_today: '今天到期！', d_left: '還有 {n} 天到期', d_ok: '還有 {n} 天才需要下次服藥',
+    rx_add_title: '新增用藥／保健品', rx_edit_title: '編輯用藥紀錄',
+    rx_name: '藥名／保健品名稱', ph_rxname: '例如：Prednisolone、魚油',
+    rx_kind: '類別', k_rx: '處方藥', k_supp: '保健品',
+    rx_start: '開始日期', rx_dose: '劑量', ph_dose: '例如：半粒、1ml', rx_freq: '次數', ph_freq: '例如：每日兩次',
+    rx_days: '食幾多日（留空＝長期服用）', ph_days: '例如：7', rx_doctor: '處方獸醫', ph_rxdoc: '保健品可留空',
+    rx_reason: '用藥原因', ph_reason: '例如：皮膚炎、關節保養',
+    rx_remind: '完結前提醒', rx_remind_days: '提前', days_unit: '日',
+    rx_active: '進行中', rx_ended: '已完結', rx_longterm: '🔵 長期服用', rx_last: '最後一日',
+    rx_going: '🟢 進行中', rx_lastday_l: '🟡 今日最後一日', rx_ended_l: '⚪ 已完結',
+    rx_left: '尚餘 {n} 日', rx_lastday: '今天是最後一日', rx_endedn: '已完結 {n} 日',
+    rx_remind_on: '🔔 提醒：開', rx_remind_off: '🔕 提醒：關',
+    rx_reason_l: '原因：', rx_doctor_l: '處方獸醫：', no_rx: '還沒有用藥紀錄 💊',
+    rp_add_title: '新增檢查報告', rp_edit_title: '編輯檢查報告', rp_type: '檢查類型',
+    rt_blood: '驗血', rt_xray: 'X 光', rt_ultrasound: '超聲波', rt_urine: '尿液／糞便檢查', rt_other: '其他',
+    rp_clinic: '檢查診所／機構', rp_summary: '結果摘要', ph_summary: '例如：腎指數稍高', rp_opinion: '獸醫意見', ph_opinion: '例如：兩星期後覆檢',
+    no_reports: '還沒有檢查報告 🔬',
+    photos: '相片', files_lbl: '相片／PDF 檔案',
+    hint_photos: '相片會自動壓縮，每項最多 10 張', hint_files: '相片會自動壓縮；PDF 每個最多 5MB；每項最多 10 個檔案',
+    w_edit: '編輯體重', w_add: '記錄體重', date: '日期', weight: '體重', note: '備註', ph_wnote: '例如：剛吃完飯', unit: '單位',
+    trend: '體重變化趨勢', trend_empty: '新增體重紀錄後會顯示折線圖', history: '歷史紀錄', no_weights: '還沒有體重紀錄 🐟',
+    clinic_title: '主診獸醫與診所', clinic_l: '診所：', vet_l: '獸醫：', phone_l: '電話：', address_l: '地址：',
+    ph_clinic: '診所名稱', ph_vet: '獸醫姓名', ph_phone: '聯絡電話', ph_address: '地址',
+    vax_title: '疫苗與預防針日誌', vax_name: '疫苗名稱', vax_date: '打針日期', vax_next: '下次打針提醒', add_vax: '新增疫苗紀錄',
+    vax_given: '打針：', vax_nextl: '下次：',
+    ev_title: '日常異常事件', type: '類型', desc: '詳細描述', ph_ev: '次數、顏色、狀況…', add_ev: '新增事件', no_events: '目前沒有異常事件，太好了 🎉',
+    et_vomit: '嘔吐', et_diarrhea: '軟便/腹瀉', et_appetite: '食慾不振', et_lethargy: '精神不佳', et_cough: '咳嗽/打噴嚏', et_other: '其他',
+    life_title: '生活行為紀錄', life_hint: '適合紀錄：挑食、情緒轉變、亂尿尿等日常行為，可附相片', category: '類別', content: '詳細內容',
+    ph_life: '例如：今日唔肯食飯...', add_life: '新增生活紀錄', no_life: '暫時無生活行為紀錄',
+    lt_diet: '飲食', lt_behavior: '行為', lt_mood: '情緒', lt_env: '環境', lt_other: '其他',
+    vets_title: '診所通訊錄 (急診/備用)', clinic_name: '診所名稱', ph_vetname: '例如：24H急診動物醫院', doctor: '醫生姓名', optional: '可留空',
+    phone_lbl: '聯絡電話', addr_note: '地址/備註', ph_note: '例如：九龍區 / 夜間需加收費', add_clinic: '新增診所',
+    doctor_prefix: '👨‍⚕️ 醫生：', no_clinics: '暫時無診所資料',
+    m_edit: '編輯寵物資料', m_new: '新增寵物', remove_photo: '移除相片', name: '名字', ph_name: '咪咪',
+    ph_breed: '例如：英國短毛貓', ph_chip: '15 位數字', del_pet: '刪除這隻寵物的所有資料',
+    c_restore: '還原會取代目前所有文字資料，確定嗎？', c_delpet: '確定要刪除「{name}」的所有資料（包括相片）嗎？此動作無法復原。',
+    c_delmed: '確定刪除這筆藥物紀錄？', c_delw: '確定刪除這筆體重紀錄？', c_delvax: '確定刪除這筆疫苗紀錄？',
+    c_delev: '確定刪除這筆事件？', c_dellife: '確定刪除這筆生活紀錄？', c_delvet: '確定刪除這間診所資料？',
+    c_delrx: '確定刪除這筆用藥紀錄？', c_delrp: '確定刪除這份檢查報告？',
+    c_import: '匯入會取代目前所有資料（包括相片和檔案），確定嗎？',
+    t_copied: '已複製備份碼，請貼到備忘錄保存', t_manual: '請長按文字框，全選後手動複製',
+    t_badfmt: '備份碼格式不正確，請重新貼上完整內容', t_invalid: '這不是有效的備份碼', t_restored: '已還原 {n} 隻寵物的資料',
+    t_quota: '儲存空間不足，請嘗試移除較大的相片', t_restfail: '儲存空間不足，還原失敗',
+    t_cycle: '請輸入有效的服藥週期', t_wpos: '請輸入有效的體重', t_days: '請輸入有效的日數',
+    t_maxfiles: '每項最多 {n} 個檔案', t_toobig: '檔案太大（PDF 上限 5MB）', t_imgonly: '這裡只可以上載相片', t_badtype: '不支援的檔案類型',
+    t_filefail: '檔案處理失敗，請再試', t_missing: '找不到檔案（可能沒有包含在備份內）',
+    t_exported: '已匯出備份檔', t_exportfail: '匯出失敗，請再試', t_imported: '已匯入 {n} 隻寵物的資料', t_importfail: '匯入失敗，檔案格式不正確',
+    al_med_over: '⚠️ {pet} 的 {name} 已逾期 {n} 天！請盡快餵藥', al_med_today: '⏰ {pet} 的 {name} 今天到期，記得餵藥！', al_med_soon: '⏰ {pet} 的 {name} 將在 {n} 天後到期',
+    al_vax_over: '⚠️ {pet} 的 {name} 疫苗已逾期 {n} 天！請盡快預約打針', al_vax_today: '⏰ {pet} 的 {name} 疫苗今天要打針！', al_vax_soon: '⏰ {pet} 的 {name} 疫苗將在 {n} 天後到期',
+    al_rx_over: '⚠️ {pet} 的 {name} 療程已完結 {n} 天，需要續藥或覆診嗎？', al_rx_today: '⏰ {pet} 的 {name} 今天是療程最後一日', al_rx_soon: '⏰ {pet} 的 {name} 療程將在 {n} 天後完結',
+    demo_name: '咪咪', demo_med1: 'Revolution 大寵愛', demo_hw: '心絲蟲預防藥', demo_vax: '三合一',
+    demo_ev: '今天早上軟便一次，精神正常。', demo_clinic: '暖暖動物醫院', demo_vet: '王醫師',
+  },
+  en: {
+    app_title: 'Pet Health Tracker', saved_note: '📱 Data is saved automatically on this device (standalone app mode)',
+    tab_home: 'Home', tab_weight: 'Weight', tab_medical: 'Medical', tab_life: 'Life', tab_more: 'More',
+    sub_care: 'Parasite care', sub_rx: 'Medication', sub_reports: 'Reports', sub_vaccine: 'Vaccines', sub_events: 'Events',
+    no_pet: 'No pets yet. Add your first family member!', add_pet: '＋ Add Pet', load_demo: 'Load sample data',
+    edit: 'Edit', delete: 'Delete', cancel: 'Cancel', ok: 'OK', save: 'Save', add: 'Add', done: 'Done', save_changes: 'Save changes', close: 'Close',
+    birth: 'Date of birth', gender: 'Sex', species: 'Species', breed: 'Breed', chip: 'Microchip no.', eg: 'e.g. ',
+    sp_cat: 'Cat', sp_dog: 'Dog', sp_rabbit: 'Rabbit', sp_other: 'Other',
+    g_unspecified: 'Not specified', g_male: 'Male', g_female: 'Female', g_male_n: 'Male (neutered)', g_female_n: 'Female (spayed)',
+    latest_weight: 'Latest weight', no_record: 'No record', next_med: 'Next meds', next_vax: 'Next vaccine',
+    backup_title: 'Text backup code', backup_desc: 'Contains text records only, not photos or files. For a backup with photos, use "Full backup" above.',
+    backup_ph: 'Your backup code appears here; paste a code here to restore', copy_backup: 'Copy backup code', restore_backup: 'Restore from code',
+    full_title: 'Full backup (with photos / files)', full_desc: 'Export everything into one file for switching phones or regular backups. Importing replaces all current data.',
+    export_full: 'Export full backup', import_full: 'Import backup file',
+    med_edit_title: 'Edit parasite / preventive medication', med_add_title: 'Add parasite / preventive medication', med_type: 'Type',
+    mt_flea: 'Flea & tick', mt_heartworm: 'Heartworm', mt_dewormer: 'Dewormer', mt_chronic: 'Long-term medication',
+    med_name: 'Medication name (e.g. Revolution, Bravecto)', ph_med: 'e.g. Revolution',
+    cycle: 'Interval', every_n: 'Every {n} days', custom_days: 'Custom days', last_dose: 'Last given', custom_cycle: 'Custom interval (days)', ph_custom: 'e.g. 14',
+    no_meds: 'No medication records yet 🐟', cycle_short: 'Interval', last: 'Last', next: 'Next', fed_today: '✅ Given today',
+    st_over: '🔴 Overdue', st_soon: '🟡 Due soon', st_ok: '🟢 On track',
+    d_over: 'Overdue by {n} days. Please give it soon!', d_today: 'Due today!', d_left: 'Due in {n} days', d_ok: 'Next dose in {n} days',
+    rx_add_title: 'Add medication / supplement', rx_edit_title: 'Edit medication record',
+    rx_name: 'Medication / supplement name', ph_rxname: 'e.g. Prednisolone, fish oil',
+    rx_kind: 'Category', k_rx: 'Prescription', k_supp: 'Supplement',
+    rx_start: 'Start date', rx_dose: 'Dose', ph_dose: 'e.g. half a tablet, 1 ml', rx_freq: 'Frequency', ph_freq: 'e.g. twice a day',
+    rx_days: 'Number of days (leave empty = ongoing)', ph_days: 'e.g. 7', rx_doctor: 'Prescribing vet', ph_rxdoc: 'Optional for supplements',
+    rx_reason: 'Reason', ph_reason: 'e.g. skin infection, joint care',
+    rx_remind: 'Remind me before it ends', rx_remind_days: 'Remind', days_unit: 'days before',
+    rx_active: 'Active', rx_ended: 'Finished', rx_longterm: '🔵 Ongoing', rx_last: 'Last day',
+    rx_going: '🟢 Active', rx_lastday_l: '🟡 Last day today', rx_ended_l: '⚪ Finished',
+    rx_left: '{n} day(s) left', rx_lastday: 'Today is the last day', rx_endedn: 'Finished {n} day(s) ago',
+    rx_remind_on: '🔔 Reminder: on', rx_remind_off: '🔕 Reminder: off',
+    rx_reason_l: 'Reason: ', rx_doctor_l: 'Vet: ', no_rx: 'No medication records yet 💊',
+    rp_add_title: 'Add test report', rp_edit_title: 'Edit test report', rp_type: 'Test type',
+    rt_blood: 'Blood test', rt_xray: 'X-ray', rt_ultrasound: 'Ultrasound', rt_urine: 'Urine / stool test', rt_other: 'Other',
+    rp_clinic: 'Clinic / lab', rp_summary: 'Result summary', ph_summary: 'e.g. kidney values slightly high', rp_opinion: "Vet's opinion", ph_opinion: 'e.g. recheck in two weeks',
+    no_reports: 'No test reports yet 🔬',
+    photos: 'Photos', files_lbl: 'Photos / PDF files',
+    hint_photos: 'Photos are compressed automatically; up to 10 per record', hint_files: 'Photos are compressed automatically; PDFs up to 5MB each; up to 10 files per record',
+    w_edit: 'Edit weight', w_add: 'Log weight', date: 'Date', weight: 'Weight', note: 'Note', ph_wnote: 'e.g. after a meal', unit: 'Unit',
+    trend: 'Weight trend', trend_empty: 'Add a weight record to see the chart', history: 'History', no_weights: 'No weight records yet 🐟',
+    clinic_title: 'Primary Vet & Clinic', clinic_l: 'Clinic: ', vet_l: 'Vet: ', phone_l: 'Phone: ', address_l: 'Address: ',
+    ph_clinic: 'Clinic name', ph_vet: 'Vet name', ph_phone: 'Phone number', ph_address: 'Address',
+    vax_title: 'Vaccination Log', vax_name: 'Vaccine', vax_date: 'Date given', vax_next: 'Next due', add_vax: 'Add vaccine record',
+    vax_given: 'Given: ', vax_nextl: 'Next: ',
+    ev_title: 'Unusual Events', type: 'Type', desc: 'Details', ph_ev: 'How often, colour, condition…', add_ev: 'Add event', no_events: 'No unusual events, great! 🎉',
+    et_vomit: 'Vomiting', et_diarrhea: 'Loose stool / diarrhea', et_appetite: 'Loss of appetite', et_lethargy: 'Lethargy', et_cough: 'Coughing / sneezing', et_other: 'Other',
+    life_title: 'Daily Life Log', life_hint: 'Good for: picky eating, mood changes, accidents outside the litter box, etc. Photos can be attached', category: 'Category', content: 'Details',
+    ph_life: 'e.g. Refused food today...', add_life: 'Add log', no_life: 'No life logs yet',
+    lt_diet: 'Diet', lt_behavior: 'Behavior', lt_mood: 'Mood', lt_env: 'Environment', lt_other: 'Other',
+    vets_title: 'Clinic Contacts (Emergency / Backup)', clinic_name: 'Clinic name', ph_vetname: 'e.g. 24H Emergency Animal Hospital', doctor: 'Doctor', optional: 'Optional',
+    phone_lbl: 'Phone', addr_note: 'Address / notes', ph_note: 'e.g. Downtown / extra night fee', add_clinic: 'Add clinic',
+    doctor_prefix: '👨‍⚕️ Doctor: ', no_clinics: 'No clinics saved yet',
+    m_edit: 'Edit pet', m_new: 'Add pet', remove_photo: 'Remove photo', name: 'Name', ph_name: 'Mimi',
+    ph_breed: 'e.g. British Shorthair', ph_chip: '15 digits', del_pet: 'Delete all data for this pet',
+    c_restore: 'Restoring will replace all current text data. Continue?', c_delpet: 'Delete all data for "{name}" (including photos)? This cannot be undone.',
+    c_delmed: 'Delete this medication record?', c_delw: 'Delete this weight record?', c_delvax: 'Delete this vaccine record?',
+    c_delev: 'Delete this event?', c_dellife: 'Delete this life log?', c_delvet: 'Delete this clinic?',
+    c_delrx: 'Delete this medication record?', c_delrp: 'Delete this test report?',
+    c_import: 'Importing will replace all current data (including photos and files). Continue?',
+    t_copied: 'Backup code copied. Paste it into a note to keep it safe', t_manual: 'Long-press the text box, select all, then copy manually',
+    t_badfmt: 'Invalid backup code format. Please paste the full code', t_invalid: 'This is not a valid backup code', t_restored: 'Restored data for {n} pet(s)',
+    t_quota: 'Storage is full. Try removing large photos', t_restfail: 'Storage is full. Restore failed',
+    t_cycle: 'Please enter a valid interval', t_wpos: 'Please enter a valid weight', t_days: 'Please enter a valid number of days',
+    t_maxfiles: 'Up to {n} files per record', t_toobig: 'File too large (PDF limit is 5MB)', t_imgonly: 'Only photos can be added here', t_badtype: 'Unsupported file type',
+    t_filefail: 'Could not process the file. Please try again', t_missing: 'File not found (it may not be included in the backup)',
+    t_exported: 'Backup file exported', t_exportfail: 'Export failed. Please try again', t_imported: 'Imported data for {n} pet(s)', t_importfail: 'Import failed: invalid file format',
+    al_med_over: '⚠️ {pet}: {name} is overdue by {n} days! Please give it soon', al_med_today: "⏰ {pet}: {name} is due today. Don't forget!", al_med_soon: '⏰ {pet}: {name} is due in {n} days',
+    al_vax_over: '⚠️ {pet}: {name} vaccine is overdue by {n} days! Please book an appointment', al_vax_today: '⏰ {pet}: {name} vaccine is due today!', al_vax_soon: '⏰ {pet}: {name} vaccine is due in {n} days',
+    al_rx_over: '⚠️ {pet}: the {name} course ended {n} days ago. Refill or recheck needed?', al_rx_today: '⏰ {pet}: today is the last day of {name}', al_rx_soon: '⏰ {pet}: the {name} course ends in {n} days',
+    demo_name: 'Mimi', demo_med1: 'Revolution', demo_hw: 'Heartworm preventive', demo_vax: 'FVRCP',
+    demo_ev: 'Soft stool once this morning, otherwise normal.', demo_clinic: 'Sunny Pet Clinic', demo_vet: 'Dr. Wang',
+  },
+};
+
+const emptyFiles = () => ({ files: [], added: [], removed: [] });
+
+function petApp() {
+  return {
+    data: { cats: [], activeId: null },   // data.cats 名稱維持不變，確保舊資料相容
+    tab: 'home',
+    msub: 'care',
+    lang: 'zh',
+    unit: 'kg',
+    tabs: [
+      { id: 'home', icon: '🐾' },
+      { id: 'weight', icon: '⚖️' },
+      { id: 'medical', icon: '🏥' },
+      { id: 'life', icon: '📘' },
+      { id: 'more', icon: '⚙️' },
+    ],
+    msubs: [
+      { id: 'care', icon: '🛡️' },
+      { id: 'rx', icon: '💊' },
+      { id: 'reports', icon: '🔬' },
+      { id: 'vaccine', icon: '💉' },
+      { id: 'events', icon: '📝' },
+    ],
+    speciesList: ['cat', 'dog', 'rabbit', 'other'],
+    genderList: ['', 'male', 'female', 'male_n', 'female_n'],
+    eventTypes: ['vomit', 'diarrhea', 'appetite', 'lethargy', 'cough', 'other'],
+    lifeTypes: ['diet', 'behavior', 'mood', 'env', 'other'],
+    reportTypes: ['blood', 'xray', 'ultrasound', 'urine', 'other'],
+
+    petModal: false, clinicEdit: false,
+    cForm: {}, mForm: {}, wForm: {}, vForm: {}, eForm: {}, vetForm: {},
+    lForm: { ...emptyFiles() }, rxForm: { ...emptyFiles() }, rpForm: { ...emptyFiles() },
+    fileCache: {}, lightbox: null,
+    confirmBox: null, toastMsg: '', toastTimer: null, backupText: '',
+
+    // ---------- 語言 / 單位 ----------
+    t(k, v) {
+      let s = (I18N[this.lang] && I18N[this.lang][k]) || I18N.zh[k] || k;
+      if (v) for (const x in v) s = s.split('{' + x + '}').join(v[x]);
+      return s;
+    },
+    lbl(prefix, code) {
+      const s = (I18N[this.lang] || {})[prefix + code];
+      return s || code;
+    },
+    setLang(l) {
+      this.lang = l;
+      try { localStorage.setItem(LANG_KEY, l); } catch (e) {}
+      this.applyLang();
+      setTimeout(() => this.drawChart(), 50);
+    },
+    applyLang() {
+      document.documentElement.lang = this.lang === 'zh' ? 'zh-Hant' : 'en';
+      document.documentElement.classList.toggle('en', this.lang === 'en');
+      document.title = this.t('app_title');
+    },
+    speciesIcon(sp) { return { cat: '🐱', dog: '🐶', rabbit: '🐰' }[sp] || '🐾'; },
+    reportIcon(t) { return { blood: '🩸', xray: '🦴', ultrasound: '🔍', urine: '🧪' }[t] || '📄'; },
+
+    fromKg(kg) {
+      kg = Number(kg);
+      if (this.unit === 'g') return Math.round(kg * 1000);
+      if (this.unit === 'lb') return Math.round(kg * 2.20462 * 100) / 100;
+      return Math.round(kg * 100) / 100;
+    },
+    toKg(v) {
+      v = Number(v);
+      let kg = v;
+      if (this.unit === 'g') kg = v / 1000;
+      else if (this.unit === 'lb') kg = v / 2.20462;
+      return Math.round(kg * 10000) / 10000;
+    },
+    fmtW(kg) { return this.fromKg(kg) + ' ' + this.unit; },
+
+    // ---------- 檔案（相片／PDF） ----------
+    src(id) {
+      if (this.fileCache[id] !== undefined) return this.fileCache[id];
+      if (!requested.has(id)) {
+        requested.add(id);
+        idbGet(id).then(r => {
+          this.fileCache = { ...this.fileCache, [id]: (r && r.type !== 'application/pdf') ? r.data : '' };
+        }).catch(() => { this.fileCache = { ...this.fileCache, [id]: '' }; });
+      }
+      return '';
+    },
+    async openFile(f) {
+      if (f.type === 'application/pdf') {
+        const w = window.open('', '_blank');
+        try {
+          const r = await idbGet(f.id);
+          if (!r) { if (w) w.close(); return this.say(this.t('t_missing')); }
+          const url = URL.createObjectURL(dataUrlToBlob(r.data));
+          if (w) { w.location.href = url; }
+          else { const a = document.createElement('a'); a.href = url; a.download = f.name || 'file.pdf'; document.body.appendChild(a); a.click(); a.remove(); }
+          setTimeout(() => URL.revokeObjectURL(url), 60000);
+        } catch (e) { if (w) w.close(); this.say(this.t('t_filefail')); }
+      } else if (this.src(f.id)) {
+        this.lightbox = f.id;
+      } else {
+        this.say(this.t('t_missing'));
+      }
+    },
+    async addFiles(form, ev, allowPdf) {
+      const list = [...ev.target.files]; ev.target.value = '';
+      for (const f of list) {
+        if (form.files.length >= MAX_FILES) { this.say(this.t('t_maxfiles', { n: MAX_FILES })); break; }
+        try {
+          let rec;
+          if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) {
+            if (!allowPdf) { this.say(this.t('t_imgonly')); continue; }
+            if (f.size > MAX_PDF) { this.say(this.t('t_toobig')); continue; }
+            rec = { id: uid(), name: f.name, type: 'application/pdf', data: await readAsDataURL(f) };
+          } else if (f.type.startsWith('image/')) {
+            rec = { id: uid(), name: f.name, type: 'image/jpeg', data: await compressImage(f) };
+          } else { this.say(this.t('t_badtype')); continue; }
+          await idbPut(rec);
+          if (rec.type !== 'application/pdf') this.fileCache = { ...this.fileCache, [rec.id]: rec.data };
+          form.files.push({ id: rec.id, name: rec.name, type: rec.type });
+          form.added.push(rec.id);
+        } catch (e) { this.say(this.t('t_filefail')); }
+      }
+    },
+    removeFile(form, f) {
+      form.files = form.files.filter(x => x.id !== f.id);
+      const i = form.added.indexOf(f.id);
+      if (i >= 0) { form.added.splice(i, 1); this.removeFiles([{ id: f.id }]); }
+      else form.removed.push(f.id);
+    },
+    async removeFiles(list) {
+      const ids = (list || []).map(f => f.id);
+      for (const id of ids) { try { await idbDel(id); } catch (e) {} requested.delete(id); }
+      if (ids.length) { const c = { ...this.fileCache }; ids.forEach(id => delete c[id]); this.fileCache = c; }
+    },
+    async commitForm(form) {
+      const ids = (form.removed || []).map(id => ({ id }));
+      form.removed = []; form.added = [];
+      await this.removeFiles(ids);
+    },
+    async discardForm(form) {
+      const ids = (form.added || []).map(id => ({ id }));
+      form.added = []; form.removed = [];
+      await this.removeFiles(ids);
+    },
+    async discardAll() {
+      await Promise.all([this.discardForm(this.lForm), this.discardForm(this.rxForm), this.discardForm(this.rpForm)]);
+      this.resetLife(); this.resetRx(); this.resetReport();
+    },
+    plainFiles(arr) { return (arr || []).map(x => ({ id: x.id, name: x.name, type: x.type })); },
+
+    // ---------- 備份 ----------
+    copyBackup() {
+      this.backupText = JSON.stringify(this.data);
+      const sel = () => this.$nextTick(() => { const b = document.getElementById('backupBox'); if (b) { b.focus(); b.select(); } });
+      try {
+        navigator.clipboard.writeText(this.backupText).then(() => this.say(this.t('t_copied')), () => { sel(); this.say(this.t('t_manual')); });
+      } catch (e) { sel(); this.say(this.t('t_manual')); }
+    },
+    restoreBackup() {
+      let d;
+      try { d = JSON.parse(this.backupText.trim()); } catch (e) { return this.say(this.t('t_badfmt')); }
+      if (!d || !Array.isArray(d.cats)) return this.say(this.t('t_invalid'));
+      this.ask(this.t('c_restore'), () => {
+        if (!d.cats.find(c => c.id === d.activeId)) d.activeId = d.cats.length ? d.cats[0].id : null;
+        try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) { return this.say(this.t('t_restfail')); }
+        this.say(this.t('t_restored', { n: d.cats.length }));
+        setTimeout(() => window.location.reload(), 300);
+      });
+    },
+    async exportFull() {
+      try {
+        const all = await idbAll(), files = {};
+        all.forEach(r => { files[r.id] = { name: r.name, type: r.type, data: r.data }; });
+        const json = JSON.stringify({ app: 'pet-health-tracker', version: 2, data: this.data, files });
+        const name = 'pet-backup-' + this.today() + '.json';
+        const file = new File([json], name, { type: 'application/json' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try { await navigator.share({ files: [file], title: name }); this.say(this.t('t_exported')); return; }
+          catch (e) { if (e && e.name === 'AbortError') return; }
+        }
+        const url = URL.createObjectURL(file);
+        const a = document.createElement('a'); a.href = url; a.download = name;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+        this.say(this.t('t_exported'));
+      } catch (e) { this.say(this.t('t_exportfail')); }
+    },
+    importFull(ev) {
+      const f = ev.target.files[0]; ev.target.value = ''; if (!f) return;
+      const r = new FileReader();
+      r.onload = () => {
+        let p; try { p = JSON.parse(r.result); } catch (e) { return this.say(this.t('t_importfail')); }
+        const d = (p && p.data && Array.isArray(p.data.cats)) ? p.data : ((p && Array.isArray(p.cats)) ? p : null);
+        if (!d) return this.say(this.t('t_importfail'));
+        const files = (p.data && p.files) ? p.files : null;
+        this.ask(this.t('c_import'), async () => {
+          try {
+            if (files) {
+              await idbClear();
+              for (const id in files) { const x = files[id]; await idbPut({ id, name: x.name, type: x.type, data: x.data }); }
+            }
+            if (!d.cats.find(c => c.id === d.activeId)) d.activeId = d.cats.length ? d.cats[0].id : null;
+            localStorage.setItem(KEY, JSON.stringify(d));
+            this.say(this.t('t_imported', { n: d.cats.length }));
+            setTimeout(() => window.location.reload(), 400);
+          } catch (e) { this.say(this.t('t_restfail')); }
+        });
+      };
+      r.readAsText(f);
+    },
+    ask(msg, fn) { this.confirmBox = { msg, fn }; },
+    yes() { const b = this.confirmBox; this.confirmBox = null; if (b && b.fn) b.fn(); },
+    say(msg) { this.toastMsg = msg; clearTimeout(this.toastTimer); this.toastTimer = setTimeout(() => this.toastMsg = '', 2800); },
+
+    // ---------- 初始化 ----------
+    init() {
+      let hadData = false;
+      try {
+        const s = JSON.parse(localStorage.getItem(KEY));
+        if (s && s.cats) {
+          hadData = s.cats.length > 0;
+          // 自動升級舊資料：補欄位 + 中文值轉代碼
+          s.cats.forEach(c => {
+            if (!c.species) c.species = 'cat';
+            if (!c.lifeLogs) c.lifeLogs = [];
+            if (!c.vets) c.vets = [];
+            if (!c.clinic) c.clinic = { name: '', vet: '', phone: '', address: '' };
+            if (!c.meds) c.meds = [];
+            if (!c.weights) c.weights = [];
+            if (!c.vaccines) c.vaccines = [];
+            if (!c.events) c.events = [];
+            if (!c.rx) c.rx = [];
+            if (!c.reports) c.reports = [];
+            c.gender = norm(c.gender || '');
+            c.meds.forEach(m => { m.type = norm(m.type); });
+            c.events.forEach(e => { e.type = norm(e.type); });
+            c.lifeLogs.forEach(l => { l.type = norm(l.type); if (!l.files) l.files = []; });
+            c.rx.forEach(r => { if (!r.files) r.files = []; });
+            c.reports.forEach(r => { if (!r.files) r.files = []; });
+          });
+          this.data = s;
+        }
+      } catch (e) {}
+
+      // 要求瀏覽器盡量保留資料（避免被自動清走）
+      try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}
+
+      // 語言：已儲存 > 舊用戶預設中文 > 按瀏覽器語言
+      let l = null, u = null;
+      try { l = localStorage.getItem(LANG_KEY); u = localStorage.getItem(UNIT_KEY); } catch (e) {}
+      this.lang = (l === 'zh' || l === 'en') ? l : (hadData ? 'zh' : ((navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : 'en'));
+      this.unit = ['kg', 'lb', 'g'].includes(u) ? u : 'kg';
+      this.applyLang();
+
+      if (this.data.cats.length && !this.data.cats.find(c => c.id === this.data.activeId)) this.data.activeId = this.data.cats[0].id;
+      this.resetMed(); this.resetWeight(); this.resetVaccine(); this.resetEvent();
+      this.resetLife(); this.resetVet(); this.resetRx(); this.resetReport();
+
+      this.$watch('data', () => {
+        try { localStorage.setItem(KEY, JSON.stringify(this.data)); } catch (e) { this.say(this.t('t_quota')); }
+        this.$nextTick(() => this.drawChart());
+      }, { deep: true });
+      this.$watch('tab', () => setTimeout(() => this.drawChart(), 50));
+      this.$watch('unit', () => {
+        try { localStorage.setItem(UNIT_KEY, this.unit); } catch (e) {}
+        this.resetWeight();
+        setTimeout(() => this.drawChart(), 50);
+      });
+      this.$watch('data.activeId', () => {
+        this.clinicEdit = false; this.resetMed(); this.resetWeight(); this.resetVaccine();
+        this.discardAll();
+        setTimeout(() => this.drawChart(), 50);
+      });
+    },
+
+    // ---------- 日期工具 ----------
+    today() { const d = new Date(); return this.iso(d); },
+    iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); },
+    parse(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); },
+    addDays(s, n) { const d = this.parse(s); d.setDate(d.getDate() + Number(n)); return this.iso(d); },
+    diffDays(s) { return Math.round((this.parse(s) - this.parse(this.today())) / 86400000); },
+    age(b) {
+      if (!b) return '';
+      const bd = this.parse(b), n = new Date();
+      let m = (n.getFullYear() - bd.getFullYear()) * 12 + n.getMonth() - bd.getMonth();
+      if (n.getDate() < bd.getDate()) m--;
+      if (m < 0) return '';
+      const y = Math.floor(m / 12), r = m % 12;
+      if (this.lang === 'zh') return y ? `${y} 歲${r ? ' ' + r + ' 個月' : ''}` : `${r} 個月大`;
+      return y ? `${y} yr${y > 1 ? 's' : ''}${r ? ' ' + r + ' mo' : ''}` : `${r} mo old`;
+    },
+
+    // ---------- 計算屬性 ----------
+    get pet() { return this.data.cats.find(c => c.id === this.data.activeId) || null; },
+    get medTypesFor() {
+      const sp = this.pet ? this.pet.species : 'cat';
+      return (sp === 'cat' || sp === 'dog') ? ['flea', 'heartworm', 'dewormer', 'chronic'] : ['flea', 'dewormer', 'chronic'];
+    },
+    get vaccSuggest() {
+      const sp = this.pet ? this.pet.species : 'cat';
+      return (VACC[sp] || VACC.other)[this.lang];
+    },
+    get latestWeight() {
+      if (!this.pet || !this.pet.weights.length) return null;
+      return [...this.pet.weights].sort((a, b) => b.date.localeCompare(a.date))[0];
+    },
+    get sortedMeds() { return [...this.pet.meds].sort((a, b) => this.nextDate(a).localeCompare(this.nextDate(b))); },
+    get nextMedSummary() {
+      if (!this.pet || !this.pet.meds.length) return {};
+      const m = this.sortedMeds[0];
+      return { date: this.nextDate(m), name: m.name };
+    },
+    get nextVaccineSummary() {
+      if (!this.pet) return {};
+      const l = this.pet.vaccines.filter(v => v.next).sort((a, b) => a.next.localeCompare(b.next));
+      const upcoming = l.find(v => this.diffDays(v.next) >= 0) || l[0];
+      return upcoming ? { date: upcoming.next, name: upcoming.name } : {};
+    },
+    get rxActive() {
+      if (!this.pet) return [];
+      return this.pet.rx.filter(r => !this.rxStatus(r).ended)
+        .sort((a, b) => (this.rxLast(a) || '9999-99-99').localeCompare(this.rxLast(b) || '9999-99-99'));
+    },
+    get rxEnded() {
+      if (!this.pet) return [];
+      return this.pet.rx.filter(r => this.rxStatus(r).ended).sort((a, b) => this.rxLast(b).localeCompare(this.rxLast(a)));
+    },
+    get reportsSorted() {
+      if (!this.pet) return [];
+      return [...this.pet.reports].sort((a, b) => b.date.localeCompare(a.date));
+    },
+    get alerts() {
+      const out = [];
+      for (const c of this.data.cats) {
+        for (const m of c.meds) {
+          const d = this.diffDays(this.nextDate(m));
+          const p = { pet: c.name, name: m.name, n: Math.abs(d) };
+          if (d < 0) out.push({ key: 'm' + m.id, days: d, text: this.t('al_med_over', p) });
+          else if (d <= 7) out.push({ key: 'm' + m.id, days: d, text: this.t(d === 0 ? 'al_med_today' : 'al_med_soon', p) });
+        }
+        for (const v of c.vaccines) {
+          if (!v.next) continue;
+          const d = this.diffDays(v.next);
+          const p = { pet: c.name, name: v.name, n: Math.abs(d) };
+          if (d < 0) out.push({ key: 'v' + v.id, days: d, text: this.t('al_vax_over', p) });
+          else if (d <= 7) out.push({ key: 'v' + v.id, days: d, text: this.t(d === 0 ? 'al_vax_today' : 'al_vax_soon', p) });
+        }
+        for (const r of (c.rx || [])) {
+          if (!r.remind || !r.days) continue;
+          const d = this.diffDays(this.rxLast(r));
+          const lim = (r.remindDays === undefined || r.remindDays === null || r.remindDays === '') ? 3 : Number(r.remindDays);
+          const p = { pet: c.name, name: r.name, n: Math.abs(d) };
+          if (d < 0) out.push({ key: 'r' + r.id, days: d, text: this.t('al_rx_over', p) });
+          else if (d <= lim) out.push({ key: 'r' + r.id, days: d, text: this.t(d === 0 ? 'al_rx_today' : 'al_rx_soon', p) });
+        }
+      }
+      return out.sort((a, b) => a.days - b.days);
+    },
+
+    // ---------- 寵物 ----------
+    openPet(c) {
+      this.cForm = c ? { ...c } : { id: null, name: '', species: 'cat', birth: '', gender: '', breed: '', chip: '', photo: '' };
+      this.petModal = true;
+    },
+    savePet() {
+      if (this.cForm.id) {
+        const c = this.data.cats.find(x => x.id === this.cForm.id);
+        Object.assign(c, { name: this.cForm.name, species: this.cForm.species, birth: this.cForm.birth, gender: this.cForm.gender, breed: this.cForm.breed, chip: this.cForm.chip, photo: this.cForm.photo });
+      } else {
+        const c = { ...this.cForm, id: uid(), meds: [], weights: [], vaccines: [], events: [], lifeLogs: [], vets: [], rx: [], reports: [], clinic: { name: '', vet: '', phone: '', address: '' } };
+        this.data.cats.push(c); this.data.activeId = c.id; this.tab = 'home';
+      }
+      this.petModal = false;
+      this.resetMed(); this.resetVaccine();
+    },
+    delPet() {
+      const id = this.cForm.id;
+      this.ask(this.t('c_delpet', { name: this.cForm.name }), () => {
+        const c = this.data.cats.find(x => x.id === id);
+        if (c) {
+          const all = [].concat((c.lifeLogs || []).flatMap(x => x.files || []), (c.rx || []).flatMap(x => x.files || []), (c.reports || []).flatMap(x => x.files || []));
+          this.removeFiles(all);
+        }
+        this.data.cats = this.data.cats.filter(x => x.id !== id);
+        this.data.activeId = this.data.cats.length ? this.data.cats[0].id : null;
+        this.petModal = false;
+      });
+    },
+    pickPhoto(ev) {
+      const f = ev.target.files[0]; if (!f) return;
+      const r = new FileReader();
+      r.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+          const S = 256, cv = document.createElement('canvas'); cv.width = cv.height = S;
+          const ctx = cv.getContext('2d'), m = Math.min(img.width, img.height);
+          ctx.drawImage(img, (img.width - m) / 2, (img.height - m) / 2, m, m, 0, 0, S, S);
+          this.cForm.photo = cv.toDataURL('image/jpeg', 0.8);
+        };
+        img.src = e.target.result;
+      };
+      r.readAsDataURL(f);
+    },
+    loadDemo() {
+      const t = this.today(), id = uid();
+      this.data.cats.push({
+        id, name: this.t('demo_name'), species: 'cat', birth: this.addDays(t, -900), gender: 'female_n', breed: this.lang === 'zh' ? '英國短毛貓' : 'British Shorthair', chip: '900123456789012', photo: '',
+        meds: [
+          { id: uid(), name: this.t('demo_med1'), type: 'flea', cycle: 30, last: this.addDays(t, -33) },
+          { id: uid(), name: 'Bravecto', type: 'flea', cycle: 90, last: this.addDays(t, -85) },
+          { id: uid(), name: this.t('demo_hw'), type: 'heartworm', cycle: 30, last: this.addDays(t, -10) },
+        ],
+        weights: [-120, -90, -60, -30, 0].map((o, i) => ({ id: uid(), date: this.addDays(t, o), kg: [3.9, 4.0, 4.1, 4.15, 4.2][i], note: '' })),
+        vaccines: [{ id: uid(), name: this.t('demo_vax'), date: this.addDays(t, -360), next: this.addDays(t, 5) }],
+        events: [{ id: uid(), date: this.addDays(t, -2), type: 'diarrhea', note: this.t('demo_ev') }],
+        lifeLogs: [], vets: [], rx: [], reports: [],
+        clinic: { name: this.t('demo_clinic'), vet: this.t('demo_vet'), phone: '0212345678', address: '' },
+      });
+      this.data.activeId = id;
+    },
+
+    // ---------- 驅蟲／預防藥 ----------
+    nextDate(m) { return this.addDays(m.last, m.cycle); },
+    statusOf(m) {
+      const d = this.diffDays(this.nextDate(m));
+      if (d < 0) return { key: 'red', label: this.t('st_over'), cls: 'bg-red-100 text-red-600', detail: this.t('d_over', { n: -d }) };
+      if (d <= 7) return { key: 'yellow', label: this.t('st_soon'), cls: 'bg-yellow-100 text-yellow-700', detail: d === 0 ? this.t('d_today') : this.t('d_left', { n: d }) };
+      return { key: 'green', label: this.t('st_ok'), cls: 'bg-green-100 text-green-700', detail: this.t('d_ok', { n: d }) };
+    },
+    vStatus(v) {
+      const d = this.diffDays(v.next);
+      if (d < 0) return { label: this.t('st_over'), cls: 'bg-red-100 text-red-600' };
+      if (d <= 7) return { label: this.t('st_soon'), cls: 'bg-yellow-100 text-yellow-700' };
+      return { label: this.t('st_ok'), cls: 'bg-green-100 text-green-700' };
+    },
+    resetMed() { this.mForm = { id: null, name: '', type: this.medTypesFor[0], cycle: '30', custom: '', last: this.today() }; },
+    saveMed() {
+      const cycle = this.mForm.cycle === 'custom' ? Number(this.mForm.custom) : Number(this.mForm.cycle);
+      if (!cycle || cycle < 1) return this.say(this.t('t_cycle'));
+      const item = { id: this.mForm.id || uid(), name: this.mForm.name.trim(), type: this.mForm.type, cycle, last: this.mForm.last };
+      const i = this.pet.meds.findIndex(m => m.id === item.id);
+      if (i >= 0) this.pet.meds[i] = item; else this.pet.meds.push(item);
+      this.resetMed();
+    },
+    editMed(m) {
+      const preset = ['30', '60', '90', '180', '365'].includes(String(m.cycle));
+      this.mForm = { id: m.id, name: m.name, type: m.type, cycle: preset ? String(m.cycle) : 'custom', custom: preset ? '' : m.cycle, last: m.last };
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    markFed(m) { m.last = this.today(); },
+    delMed(id) { this.ask(this.t('c_delmed'), () => { this.pet.meds = this.pet.meds.filter(m => m.id !== id); }); },
+
+    // ---------- 用藥紀錄（處方／保健品） ----------
+    hasDays(v) { return v !== '' && v !== null && v !== undefined && Number(v) > 0; },
+    rxLast(r) { return r.days ? this.addDays(r.start, Number(r.days) - 1) : null; },
+    rxStatus(r) {
+      const last = this.rxLast(r);
+      if (!last) return { label: this.t('rx_longterm'), cls: 'bg-orange-100 text-orange-600', detail: '', ended: false };
+      const d = this.diffDays(last);
+      if (d < 0) return { label: this.t('rx_ended_l'), cls: 'bg-orange-50 text-stone-500', detail: this.t('rx_endedn', { n: -d }), ended: true };
+      if (d === 0) return { label: this.t('rx_lastday_l'), cls: 'bg-yellow-100 text-yellow-700', detail: this.t('rx_lastday'), ended: false };
+      return { label: this.t('rx_going'), cls: 'bg-green-100 text-green-700', detail: this.t('rx_left', { n: d + 1 }), ended: false };
+    },
+    resetRx() {
+      this.rxForm = { id: null, name: '', kind: 'rx', dose: '', freq: '', start: this.today(), days: '', reason: '', doctor: '', note: '', remind: false, remindDays: 3, ...emptyFiles() };
+    },
+    async saveRx() {
+      const f = this.rxForm;
+      const days = this.hasDays(f.days) ? Number(f.days) : null;
+      if (f.days !== '' && f.days !== null && f.days !== undefined && days === null) return this.say(this.t('t_days'));
+      const rd = (f.remindDays === '' || f.remindDays === null || f.remindDays === undefined) ? 3 : Number(f.remindDays);
+      const item = {
+        id: f.id || uid(), name: f.name.trim(), kind: f.kind, dose: f.dose, freq: f.freq, start: f.start, days,
+        reason: f.reason, doctor: f.doctor, note: f.note,
+        remind: !!f.remind && days !== null, remindDays: (isNaN(rd) || rd < 0) ? 3 : rd,
+        files: this.plainFiles(f.files),
+      };
+      await this.commitForm(f);
+      const i = this.pet.rx.findIndex(x => x.id === item.id);
+      if (i >= 0) this.pet.rx[i] = item; else this.pet.rx.push(item);
+      this.resetRx();
+    },
+    async editRx(r) {
+      await this.discardForm(this.rxForm);
+      this.rxForm = {
+        id: r.id, name: r.name, kind: r.kind || 'rx', dose: r.dose || '', freq: r.freq || '', start: r.start,
+        days: r.days ? r.days : '', reason: r.reason || '', doctor: r.doctor || '', note: r.note || '',
+        remind: !!r.remind, remindDays: (r.remindDays === undefined || r.remindDays === null) ? 3 : r.remindDays,
+        files: this.plainFiles(r.files), added: [], removed: [],
+      };
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    async cancelRx() { await this.discardForm(this.rxForm); this.resetRx(); },
+    delRx(id) {
+      this.ask(this.t('c_delrx'), () => {
+        const r = this.pet.rx.find(x => x.id === id);
+        if (r) this.removeFiles(r.files);
+        this.pet.rx = this.pet.rx.filter(x => x.id !== id);
+      });
+    },
+
+    // ---------- 檢查報告 ----------
+    resetReport() {
+      this.rpForm = { id: null, type: 'blood', date: this.today(), clinic: '', summary: '', opinion: '', ...emptyFiles() };
+    },
+    async saveReport() {
+      const f = this.rpForm;
+      const item = { id: f.id || uid(), type: f.type, date: f.date, clinic: f.clinic, summary: f.summary, opinion: f.opinion, files: this.plainFiles(f.files) };
+      await this.commitForm(f);
+      const i = this.pet.reports.findIndex(x => x.id === item.id);
+      if (i >= 0) this.pet.reports[i] = item; else this.pet.reports.push(item);
+      this.resetReport();
+    },
+    async editReport(r) {
+      await this.discardForm(this.rpForm);
+      this.rpForm = { id: r.id, type: r.type, date: r.date, clinic: r.clinic || '', summary: r.summary || '', opinion: r.opinion || '', files: this.plainFiles(r.files), added: [], removed: [] };
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    async cancelReport() { await this.discardForm(this.rpForm); this.resetReport(); },
+    delReport(id) {
+      this.ask(this.t('c_delrp'), () => {
+        const r = this.pet.reports.find(x => x.id === id);
+        if (r) this.removeFiles(r.files);
+        this.pet.reports = this.pet.reports.filter(x => x.id !== id);
+      });
+    },
+
+    // ---------- 體重 ----------
+    resetWeight() { this.wForm = { id: null, date: this.today(), kg: '', note: '' }; },
+    saveWeight() {
+      const val = Number(this.wForm.kg);
+      if (!val || val <= 0) return this.say(this.t('t_wpos'));
+      const item = { id: this.wForm.id || uid(), date: this.wForm.date, kg: this.toKg(val), note: this.wForm.note };
+      const i = this.pet.weights.findIndex(w => w.id === item.id);
+      if (i >= 0) this.pet.weights[i] = item; else this.pet.weights.push(item);
+      this.resetWeight();
+    },
+    editWeight(w) { this.wForm = { id: w.id, date: w.date, kg: this.fromKg(w.kg), note: w.note }; window.scrollTo({ top: 0, behavior: 'smooth' }); },
+    delWeight(id) { this.ask(this.t('c_delw'), () => { this.pet.weights = this.pet.weights.filter(w => w.id !== id); }); },
+
+    drawChart() {
+      if (this.tab !== 'weight' || !this.pet) return;
+      if (typeof Chart === 'undefined') return;
+      const cv = document.getElementById('weightChart'); if (!cv) return;
+      const ws = [...this.pet.weights].sort((a, b) => a.date.localeCompare(b.date));
+      const old = Chart.getChart(cv); if (old) old.destroy();
+      weightChart = null;
+      const unit = this.unit;
+      weightChart = new Chart(cv, {
+        type: 'line',
+        data: {
+          labels: ws.map(w => w.date.slice(5)),
+          datasets: [{ label: this.t('weight') + ' (' + unit + ')', data: ws.map(w => this.fromKg(w.kg)), borderColor: '#f9a98f', backgroundColor: 'rgba(249,169,143,.2)', fill: true, tension: .35, pointBackgroundColor: '#fff', pointBorderColor: '#f26f4e', pointBorderWidth: 2, pointRadius: 5 }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { title: i => ws[i[0].dataIndex].date } } }, scales: { y: { title: { display: true, text: unit } } } }
+      });
+    },
+
+    // ---------- 疫苗 ----------
+    resetVaccine() { this.vForm = { name: '', date: this.today(), next: '' }; },
+    saveVaccine() { this.pet.vaccines.push({ id: uid(), ...this.vForm }); this.resetVaccine(); },
+    delVaccine(id) { this.ask(this.t('c_delvax'), () => { this.pet.vaccines = this.pet.vaccines.filter(v => v.id !== id); }); },
+
+    // ---------- 異常事件 ----------
+    resetEvent() { this.eForm = { date: this.today(), type: this.eventTypes[0], note: '' }; },
+    saveEvent() { this.pet.events.push({ id: uid(), ...this.eForm }); this.resetEvent(); },
+    delEvent(id) { this.ask(this.t('c_delev'), () => { this.pet.events = this.pet.events.filter(e => e.id !== id); }); },
+    eventIcon(t) { return { vomit: '🤮', diarrhea: '💩', appetite: '🍽️', lethargy: '😔', cough: '🤧' }[t] || '📌'; },
+
+    // ---------- 生活紀錄 ----------
+    resetLife() { this.lForm = { date: this.today(), type: this.lifeTypes[0], note: '', ...emptyFiles() }; },
+    async saveLife() {
+      const f = this.lForm;
+      const item = { id: uid(), date: f.date, type: f.type, note: f.note, files: this.plainFiles(f.files) };
+      await this.commitForm(f);
+      this.pet.lifeLogs.push(item);
+      this.resetLife();
+    },
+    delLife(id) {
+      this.ask(this.t('c_dellife'), () => {
+        const l = this.pet.lifeLogs.find(x => x.id === id);
+        if (l) this.removeFiles(l.files);
+        this.pet.lifeLogs = this.pet.lifeLogs.filter(x => x.id !== id);
+      });
+    },
+
+    // ---------- 診所通訊錄 ----------
+    resetVet() { this.vetForm = { name: '', doctor: '', phone: '', note: '' }; },
+    saveVet() { this.pet.vets.push({ id: uid(), ...this.vetForm }); this.resetVet(); },
+    delVet(id) { this.ask(this.t('c_delvet'), () => { this.pet.vets = this.pet.vets.filter(v => v.id !== id); }); },
+  };
+}
+</script>
+
+</body>
+</html>
