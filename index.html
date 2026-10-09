@@ -621,7 +621,7 @@
                 <div class="bg-orange-50 rounded-xl p-2" x-show="r.dose"><span class="lbl" x-text="t('rx_dose')"></span><b x-text="r.dose"></b></div>
                 <div class="bg-orange-50 rounded-xl p-2" x-show="r.freq"><span class="lbl" x-text="t('rx_freq')"></span><b x-text="r.freq"></b></div>
                 <div class="bg-orange-50 rounded-xl p-2"><span class="lbl" x-text="t('rx_start')"></span><b x-text="r.start"></b></div>
-                <div class="bg-orange-50 rounded-xl p-2"><span class="lbl" x-text="t('rx_last')"></span><b x-text="rxLast(r)"></b></div>
+                <div class="bg-orange-50 rounded-xl p-2" x-show="rxLast(r)"><span class="lbl" x-text="t('rx_last')"></span><b x-text="rxLast(r)"></b></div>
               </div>
               <div class="text-sm text-stone-500" x-text="rxStatus(r).detail"></div>
               <p class="text-sm" x-show="r.reason" x-text="t('rx_reason_l') + r.reason"></p>
@@ -1016,8 +1016,19 @@
     <form class="bg-white rounded-3xl p-5 w-full max-w-sm space-y-3" style="color:var(--fg)" @submit.prevent="confirmSkip()">
       <h3 class="font-extrabold text-lg" x-text="'⏭ ' + t('skip_title')"></h3>
       <p class="text-sm text-stone-500" x-text="skipBox ? (skipBox.petName + ' · ' + skipBox.title + ' · ' + skipBox.time) : ''"></p>
-      <div><label class="lbl" x-text="t('skip_reason')"
-<div class="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" x-show="confirmBox" x-transition.opacity @click.self="confirmBox=null">
+      <div>
+        <label class="lbl" x-text="t('skip_reason')"></label>
+        <input class="inp" x-model="skipReason" :placeholder="t('ph_skip')">
+      </div>
+      <div class="flex gap-2 pt-1">
+        <button type="button" class="btn btn-soft flex-1" @click="skipBox=null" x-text="t('cancel')"></button>
+        <button type="submit" class="btn btn-main flex-1" x-text="t('ok')"></button>
+      </div>
+    </form>
+  </div>
+
+  <!-- 確認對話框 Modal -->
+  <div class="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" x-show="confirmBox" x-transition.opacity @click.self="confirmBox=null">
     <div class="bg-white rounded-3xl p-5 w-full max-w-sm space-y-4 text-center" style="color:var(--fg)">
       <div class="text-4xl">🐾</div>
       <p class="font-bold" x-text="confirmBox ? confirmBox.msg : ''"></p>
@@ -1028,8 +1039,8 @@
     </div>
   </div>
 
-<!-- 使用說明 -->
-<div class="fixed inset-0 z-[55] bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4" x-show="guideModal" x-transition.opacity @click.self="guideModal=false">
+  <!-- 使用說明 Modal -->
+  <div class="fixed inset-0 z-[55] bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4" x-show="guideModal" x-transition.opacity @click.self="guideModal=false">
     <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 space-y-3 max-h-[92vh] overflow-y-auto" style="color:var(--fg)">
       <h3 class="font-extrabold text-lg" x-text="'📖 ' + t('guide_title')"></h3>
       <ol class="space-y-2 text-sm">
@@ -1039,8 +1050,8 @@
     </div>
   </div>
 
-<!-- 首次歡迎 -->
-<div class="fixed inset-0 z-[58] bg-black/40 flex items-center justify-center p-4" x-show="welcomeModal" x-transition.opacity>
+  <!-- 首次歡迎 Modal -->
+  <div class="fixed inset-0 z-[58] bg-black/40 flex items-center justify-center p-4" x-show="welcomeModal" x-transition.opacity>
     <div class="bg-white rounded-3xl p-5 w-full max-w-sm space-y-3" style="color:var(--fg)">
       <div class="text-4xl text-center">🐾</div>
       <h3 class="font-extrabold text-lg text-center" x-text="t('w_title')"></h3>
@@ -1056,25 +1067,28 @@
     </div>
   </div>
 
-<!-- 相片放大 -->
-<div class="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-3" x-show="lightbox" x-transition.opacity @click="lightbox=null">
+  <!-- 相片放大 Modal -->
+  <div class="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-3" x-show="lightbox" x-transition.opacity @click="lightbox=null">
     <img :src="lightbox ? src(lightbox) : null" class="max-w-full max-h-full object-contain rounded-lg">
     <button type="button" class="absolute top-4 right-4 bg-white/90 text-stone-700 rounded-full w-10 h-10 font-bold" @click.stop="lightbox=null" :aria-label="t('close')">✕</button>
   </div>
 
-<div class="fixed left-1/2 -translate-x-1/2 z-[70] rounded-full px-4 py-2 text-sm font-bold shadow-lg max-w-[90vw] text-center" style="bottom:5.5rem;background:var(--fg);color:#fff" x-show="toastMsg" x-transition x-text="toastMsg"></div>
+  <!-- Toast 訊息提示 -->
+  <div class="fixed left-1/2 -translate-x-1/2 z-[70] rounded-full px-4 py-2 text-sm font-bold shadow-lg max-w-[90vw] text-center" style="bottom:5.5rem;background:var(--fg);color:#fff" x-show="toastMsg" x-transition x-text="toastMsg"></div>
+
 </div>
+
 <script>
-const KEY = 'catHealthTracker_standalone_v1';   // 與舊版相同，舊資料自動沿用
+const KEY = 'catHealthTracker_standalone_v1';   
 const LANG_KEY = 'petTracker_lang';
 const UNIT_KEY = 'petTracker_unit';
 const WELCOME_KEY = 'petTracker_welcome_v2';
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
-let weightChart = null;                 // 放喺 Alpine 外面，避免被 Proxy 包住
+let weightChart = null;                 
 const MAX_FILES = 10;
 const MAX_PDF = 5 * 1024 * 1024;
-const GRACE_MIN = 120;                  // 超過 2 小時未記錄 = 逾時
+const GRACE_MIN = 120;                  
 const requested = new Set();
 
 /* ---------- IndexedDB ---------- */
@@ -1095,6 +1109,7 @@ async function idbGet(id) { const db = await openDB(); return new Promise((res, 
 async function idbDel(id) { const db = await openDB(); return new Promise((res, rej) => { const tx = db.transaction(STORE, 'readwrite'); tx.objectStore(STORE).delete(id); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); }); }
 async function idbAll() { const db = await openDB(); return new Promise((res, rej) => { const q = db.transaction(STORE).objectStore(STORE).getAll(); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
 async function idbClear() { const db = await openDB(); return new Promise((res, rej) => { const tx = db.transaction(STORE, 'readwrite'); tx.objectStore(STORE).clear(); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); }); }
+
 /* ---------- 檔案工具 ---------- */
 function readAsDataURL(file) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(file); }); }
 function compressImage(file, max = 1200, q = 0.8) {
@@ -1153,7 +1168,6 @@ const I18N = {
     backup_ph: '備份碼會顯示在這裡；還原時把備份碼貼在這裡', copy_backup: '複製備份碼', restore_backup: '從備份碼還原',
     full_title: '完整備份（連相片／檔案）', full_desc: '匯出成一個檔案，換手機或定期備份時使用。匯入會取代目前所有資料。',
     export_full: '匯出完整備份檔', import_full: '匯入備份檔',
-    // 今日待辦／每日藥物
     today_title: '今日待辦', btn_given: '✅ 已餵', btn_injected: '✅ 已打', btn_skip: '跳過', btn_undo: '↩ 復原',
     sl_done: '✅ 已完成', sl_skipped: '⏭ 已跳過', sl_upcoming: '⏳ 稍後', sl_due: '🟡 時間到', sl_late: '🔴 已逾時', sl_missed: '🔴 未記錄', sl_future: '未到日期', sl_na: '',
     skip_title: '跳過這次', skip_reason: '原因（可留空）', ph_skip: '例如：不肯食藥、嘔吐',
@@ -1162,7 +1176,6 @@ const I18N = {
     dm_times: '服藥時間', dm_add_time: '＋ 加時間', dm_start: '開始日期', dm_end: '完結日期（留空＝長期）',
     no_daily: '還沒有每日藥物 💊', dm_n_times: '每日 {n} 次', dm_longterm: '長期', dm_until: '至 {d}', dm_ended: '已完結',
     dm_rate7: '近 7 日：完成 {d}/{t}，跳過 {s}', dm_hist: '近 14 日', dm_legend: '綠＝完成　黃＝跳過　紅＝未記錄　灰＝無安排',
-    // 皮下水
     fl_title: '皮下水', fl_plan: '治療計劃', fl_plan_none: '未設定計劃，你可以只記錄每次打針；設定計劃後會有今日待辦同提示。',
     fl_set_plan: '設定計劃', fl_edit_plan: '編輯計劃', fl_fluid: '液體種類', ph_fluid: '例如：乳酸林格氏液',
     fl_per: '每次份量 (ml)', fl_mode: '頻率', fl_mode_daily: '每日打 N 次', fl_mode_int: '每隔 N 日打一次',
@@ -1176,7 +1189,6 @@ const I18N = {
     cal_export: '📅 匯出到日曆', cal_warn: '匯出前請留意：如果之前匯出過，舊嘅日曆事件唔會自動刪除，要喺手機日曆自己刪走，否則會重複提醒。確定匯出？',
     cal_none: '沒有可匯出的排程（請先設定每日藥物或皮下水計劃）', cal_done: '已匯出，請用日曆開啟並加入', cal_fail: '匯出失敗，請再試',
     cal_dose: '💊 {pet}：{name}{dose}', cal_fluid: '💧 {pet}：皮下水 {ml}ml',
-    // 驅蟲
     med_edit_title: '編輯驅蟲／預防藥', med_add_title: '新增驅蟲／預防藥', med_type: '藥物類型',
     mt_flea: '杜虱/防虱藥', mt_heartworm: '心絲蟲藥', mt_dewormer: '體內杜蟲藥', mt_chronic: '長期慢性病藥物',
     med_name: '藥物名稱（如 Revolution、Bravecto）', ph_med: '例如：Revolution',
@@ -1184,7 +1196,6 @@ const I18N = {
     no_meds: '還沒有藥物紀錄 🐟', cycle_short: '週期', last: '上次', next: '下次', fed_today: '✅ 今日已餵藥',
     st_over: '🔴 已逾期', st_soon: '🟡 即將到期', st_ok: '🟢 正常',
     d_over: '已逾期 {n} 天，請盡快餵藥！', d_today: '今天到期！', d_left: '還有 {n} 天到期', d_ok: '還有 {n} 天才需要下次服藥',
-    // 用藥
     rx_add_title: '新增用藥／保健品', rx_edit_title: '編輯用藥紀錄', rx_name: '藥名／保健品名稱', ph_rxname: '例如：Prednisolone、魚油',
     rx_kind: '類別', k_rx: '處方藥', k_supp: '保健品', rx_start: '開始日期', rx_dose: '劑量', ph_dose: '例如：半粒、1ml',
     rx_freq: '次數', ph_freq: '例如：每日兩次', rx_days: '食幾多日（留空＝長期服用）', ph_days: '例如：7',
@@ -1385,7 +1396,6 @@ function petApp() {
     fileCache: {}, lightbox: null,
     confirmBox: null, toastMsg: '', toastTimer: null, backupText: '',
 
-    /* ---------- 語言 / 單位 ---------- */
     t(k, v) {
       let s = (I18N[this.lang] && I18N[this.lang][k]) || I18N.zh[k] || k;
       if (v) for (const x in v) s = s.split('{' + x + '}').join(v[x]);
@@ -1418,7 +1428,6 @@ function petApp() {
     },
     fmtW(kg) { return this.fromKg(kg) + ' ' + this.unit; },
 
-    /* ---------- 檔案 ---------- */
     src(id) {
       if (this.fileCache[id] !== undefined) return this.fileCache[id];
       if (!requested.has(id)) {
@@ -1481,7 +1490,6 @@ function petApp() {
     },
     plainFiles(arr) { return (arr || []).map(x => ({ id: x.id, name: x.name, type: x.type })); },
 
-    /* ---------- 備份 ---------- */
     copyBackup() {
       this.backupText = JSON.stringify(this.data);
       const sel = () => this.$nextTick(() => { const b = document.getElementById('backupBox'); if (b) { b.focus(); b.select(); } });
@@ -1547,7 +1555,7 @@ function petApp() {
       this.welcomeModal = false;
       if (more) this.guideModal = true;
     },
-    /* ---------- 初始化 ---------- */
+
     init() {
       this.clock = Date.now();
       let hadData = false;
@@ -1619,7 +1627,6 @@ function petApp() {
       try { if (!localStorage.getItem(WELCOME_KEY)) this.welcomeModal = true; } catch (e) {}
     },
 
-    /* ---------- 日期／時間工具 ---------- */
     today() { return this.iso(new Date(this.clock)); },
     nowHM() { const d = new Date(this.clock); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); },
     mins(hm) { const [h, m] = String(hm || '0:0').split(':').map(Number); return (h || 0) * 60 + (m || 0); },
@@ -1637,7 +1644,7 @@ function petApp() {
       if (this.lang === 'zh') return y ? `${y} 歲${r ? ' ' + r + ' 個月' : ''}` : `${r} 個月大`;
       return y ? `${y} yr${y > 1 ? 's' : ''}${r ? ' ' + r + ' mo' : ''}` : `${r} mo old`;
     },
-/* ---------- 計算屬性 ---------- */
+
     get pet() { return this.data.cats.find(c => c.id === this.data.activeId) || null; },
     findPet(id) { return this.data.cats.find(c => c.id === id) || null; },
     latestWeightOf(p) { if (!p || !p.weights.length) return null; return [...p.weights].sort((a, b) => b.date.localeCompare(a.date))[0]; },
@@ -1667,7 +1674,7 @@ function petApp() {
       return this.pet.rx.filter(r => this.rxStatus(r).ended).sort((a, b) => this.rxLast(b).localeCompare(this.rxLast(a)));
     },
     get reportsSorted() { return this.pet ? [...this.pet.reports].sort((a, b) => b.date.localeCompare(a.date)) : []; },
-/* ---------- 每日藥物／待辦 ---------- */
+
     slotStatus(date, time, ls) {
       if (ls) return ls === 'd' ? 'done' : 'skipped';
       const today = this.today();
@@ -1850,7 +1857,6 @@ function petApp() {
       });
     },
 
-    /* ---------- 皮下水 ---------- */
     perKgText(p, ml) {
       const w = this.latestWeightOf(p), v = Number(ml);
       if (!w || !(v > 0)) return '';
@@ -1959,7 +1965,6 @@ function petApp() {
       return l ? this.lbl('sx_', l.site) : '';
     },
 
-    /* ---------- 日曆匯出 (.ics) ---------- */
     icsFold(line) {
       const enc = new TextEncoder(); let out = '', cur = '', bytes = 0;
       for (const ch of line) {
@@ -2011,7 +2016,6 @@ function petApp() {
       });
     },
 
-    /* ---------- 提醒橫幅 ---------- */
     get alerts() {
       const out = [];
       for (const c of this.data.cats) {
@@ -2048,7 +2052,6 @@ function petApp() {
       return out.sort((a, b) => a.days - b.days);
     },
 
-    /* ---------- 寵物 ---------- */
     openPet(c) {
       this.cForm = c ? { ...c } : { id: null, name: '', species: 'cat', birth: '', gender: '', breed: '', chip: '', photo: '' };
       this.petModal = true;
@@ -2106,7 +2109,7 @@ function petApp() {
       });
       this.data.activeId = id;
     },
-    /* ---------- 驅蟲／預防藥 ---------- */
+
     nextDate(m) { return this.addDays(m.last, m.cycle); },
     statusOf(m) {
       const d = this.diffDays(this.nextDate(m));
@@ -2137,7 +2140,6 @@ function petApp() {
     markFed(m) { m.last = this.today(); },
     delMed(id) { this.ask(this.t('c_delmed'), () => { this.pet.meds = this.pet.meds.filter(m => m.id !== id); }); },
 
-    /* ---------- 用藥紀錄（處方／保健品） ---------- */
     hasDays(v) { return v !== '' && v !== null && v !== undefined && Number(v) > 0; },
     rxLast(r) { return r.days ? this.addDays(r.start, Number(r.days) - 1) : null; },
     rxStatus(r) {
@@ -2181,7 +2183,7 @@ function petApp() {
         this.pet.rx = this.pet.rx.filter(x => x.id !== id);
       });
     },
-    /* ---------- 檢查報告 ---------- */
+
     resetReport() { this.rpForm = { id: null, type: 'blood', date: this.today(), clinic: '', summary: '', opinion: '', ...emptyFiles() }; },
     async saveReport() {
       const f = this.rpForm;
@@ -2204,7 +2206,6 @@ function petApp() {
       });
     },
 
-    /* ---------- 體重 ---------- */
     resetWeight() { this.wForm = { id: null, date: this.today(), kg: '', note: '' }; },
     saveWeight() {
       const val = Number(this.wForm.kg);
@@ -2234,7 +2235,6 @@ function petApp() {
       });
     },
 
-    /* ---------- 疫苗／事件／生活／診所 ---------- */
     resetVaccine() { this.vForm = { name: '', date: this.today(), next: '' }; },
     saveVaccine() { this.pet.vaccines.push({ id: uid(), ...this.vForm }); this.resetVaccine(); },
     delVaccine(id) { this.ask(this.t('c_delvax'), () => { this.pet.vaccines = this.pet.vaccines.filter(v => v.id !== id); }); },
