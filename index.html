@@ -42,11 +42,12 @@
 
   <!-- 頂部標題 -->
   <header class="px-4 pt-5 pb-2 max-w-2xl mx-auto flex items-center justify-between gap-2">
-    <h1 class="text-xl font-extrabold text-orange-400" x-text="'🐾 ' + t('app_title')"></h1>
-    <div class="flex items-center gap-2">
+    <h1 class="text-lg font-extrabold text-orange-400 truncate min-w-0" x-text="'🐾 ' + t('app_title')"></h1>
+    <div class="flex items-center gap-2 shrink-0">
+      <button type="button" class="btn btn-soft !py-1.5 !px-3 text-sm" @click="guideModal=true" :aria-label="t('guide_title')">❓</button>
       <button type="button" class="btn btn-soft !py-1.5 !px-3 text-sm" @click="setLang(lang==='zh' ? 'en' : 'zh')" x-text="lang==='zh' ? 'EN' : '中文'"></button>
       <template x-if="data.cats.length">
-        <select class="inp !w-auto !py-1.5 !text-sm font-bold" x-model="data.activeId">
+        <select class="inp !w-auto !max-w-[7rem] !py-1.5 !text-sm font-bold" x-model="data.activeId">
           <template x-for="c in data.cats" :key="c.id"><option :value="c.id" x-text="c.name"></option></template>
         </select>
       </template>
@@ -85,6 +86,37 @@
 
       <!-- ========== 1. 主頁 ========== -->
       <section x-show="tab==='home'" class="space-y-4">
+
+        <!-- 今日待辦 -->
+        <template x-if="todayGroups.length">
+          <div class="card p-5 space-y-3">
+            <h3 class="font-extrabold text-lg" x-text="'📋 ' + t('today_title')"></h3>
+            <template x-for="g in todayGroups" :key="g.petId">
+              <div class="space-y-2">
+                <div class="text-sm font-bold text-orange-400" x-show="data.cats.length>1" x-text="speciesIcon(g.species) + ' ' + g.petName"></div>
+                <template x-for="it in g.items" :key="it.key">
+                  <div class="rounded-2xl border-2 p-3 flex items-center gap-3" :class="rowCls(it.status)">
+                    <div class="text-center w-14 shrink-0">
+                      <div class="font-extrabold" x-text="it.time"></div>
+                      <div class="text-xs" x-text="it.kind==='med' ? '💊' : '💧'"></div>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <div class="font-bold break-words" x-text="it.title"></div>
+                      <div class="text-xs text-stone-500 break-words" x-show="it.sub" x-text="it.sub"></div>
+                      <div class="text-xs font-bold break-words" :class="statusCls(it.status)" x-text="statusText(it)"></div>
+                    </div>
+                    <div class="flex flex-col gap-1 shrink-0">
+                      <button type="button" class="btn btn-green !px-3 !py-1 text-sm" x-show="isPending(it)" @click="doItem(it)" x-text="it.kind==='med' ? t('btn_given') : t('btn_injected')"></button>
+                      <button type="button" class="btn btn-soft !px-3 !py-1 text-sm" x-show="isPending(it)" @click="skipItem(it)" x-text="t('btn_skip')"></button>
+                      <button type="button" class="btn btn-soft !px-3 !py-1 text-sm" x-show="isFinished(it)" @click="undoItem(it)" x-text="t('btn_undo')"></button>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
+        </template>
+
         <div class="card p-5 text-center">
           <div class="w-28 h-28 rounded-full mx-auto bg-orange-100 border-4 border-orange-200 overflow-hidden flex items-center justify-center text-5xl">
             <template x-if="pet.photo"><img :src="pet.photo" class="w-full h-full object-cover"></template>
@@ -178,7 +210,237 @@
           </template>
         </div>
 
-        <!-- ---- 3a. 驅蟲提醒 ---- -->
+        <!-- ---- 3a. 每日藥物 ---- -->
+        <div x-show="msub==='daily'" class="space-y-4">
+
+          <div class="card p-5 space-y-3">
+            <h3 class="font-extrabold text-lg" x-text="'⏰ ' + t('dm_slots')"></h3>
+            <div class="flex items-center gap-2">
+              <button type="button" class="btn btn-soft !px-3" @click="dmShift(-1)">‹</button>
+              <input type="date" class="inp" x-model="dmDate">
+              <button type="button" class="btn btn-soft !px-3" @click="dmShift(1)">›</button>
+              <button type="button" class="btn btn-soft whitespace-nowrap" @click="dmDate = today()" x-text="t('dm_today')"></button>
+            </div>
+            <template x-for="it in dmItems" :key="it.key">
+              <div class="rounded-2xl border-2 p-3 flex items-center gap-3" :class="rowCls(it.status)">
+                <div class="text-center w-14 shrink-0">
+                  <div class="font-extrabold" x-text="it.time"></div>
+                  <div class="text-xs">💊</div>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="font-bold break-words" x-text="it.title"></div>
+                  <div class="text-xs text-stone-500 break-words" x-show="it.sub" x-text="it.sub"></div>
+                  <div class="text-xs font-bold break-words" :class="statusCls(it.status)" x-text="statusText(it)"></div>
+                </div>
+                <div class="flex flex-col gap-1 shrink-0">
+                  <button type="button" class="btn btn-green !px-3 !py-1 text-sm" x-show="isPending(it)" @click="doItem(it)" x-text="t('btn_given')"></button>
+                  <button type="button" class="btn btn-soft !px-3 !py-1 text-sm" x-show="isPending(it)" @click="skipItem(it)" x-text="t('btn_skip')"></button>
+                  <button type="button" class="btn btn-soft !px-3 !py-1 text-sm" x-show="isFinished(it)" @click="undoItem(it)" x-text="t('btn_undo')"></button>
+                </div>
+              </div>
+            </template>
+            <p class="text-center text-stone-400 py-2" x-show="!dmItems.length" x-text="t('dm_no_slots')"></p>
+            <button type="button" class="btn btn-soft w-full" @click="exportCalendar()" x-text="t('cal_export')"></button>
+          </div>
+
+          <form class="card p-5 space-y-3" @submit.prevent="saveDm()">
+            <h3 class="font-extrabold text-lg" x-text="dmForm.id ? '✏️ ' + t('dm_edit') : '💊 ' + t('dm_add')"></h3>
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="lbl" x-text="t('dm_name')"></label><input class="inp" required x-model="dmForm.name" :placeholder="t('ph_dmname')"></div>
+              <div><label class="lbl" x-text="t('dm_dose')"></label><input class="inp" x-model="dmForm.dose" :placeholder="t('ph_dmdose')"></div>
+            </div>
+            <div>
+              <label class="lbl" x-text="t('dm_times')"></label>
+              <div class="space-y-2">
+                <template x-for="(tm, i) in dmForm.times" :key="i">
+                  <div class="flex items-center gap-2">
+                    <input type="time" class="inp" required x-model="dmForm.times[i]">
+                    <button type="button" class="btn btn-soft !px-3" x-show="dmForm.times.length>1" @click="dmForm.times.splice(i,1)">✕</button>
+                  </div>
+                </template>
+              </div>
+              <button type="button" class="btn btn-soft mt-2 text-sm" @click="dmForm.times.push('12:00')" x-text="t('dm_add_time')"></button>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="lbl" x-text="t('dm_start')"></label><input type="date" class="inp" required x-model="dmForm.start"></div>
+              <div><label class="lbl" x-text="t('dm_end')"></label><input type="date" class="inp" x-model="dmForm.end"></div>
+            </div>
+            <div><label class="lbl" x-text="t('note')"></label><textarea rows="2" class="inp" x-model="dmForm.note"></textarea></div>
+            <div class="flex gap-2">
+              <button class="btn btn-main flex-1" type="submit" x-text="dmForm.id ? t('save_changes') : t('add')"></button>
+              <button type="button" class="btn btn-soft" x-show="dmForm.id" @click="resetDm()" x-text="t('cancel')"></button>
+            </div>
+          </form>
+
+          <p class="text-center text-stone-400 py-4" x-show="!pet.daily.length" x-text="t('no_daily')"></p>
+          <p class="text-xs text-stone-400 px-1" x-show="pet.daily.length" x-text="t('dm_legend')"></p>
+          <template x-for="m in dmList" :key="m.id">
+            <div class="card p-4 space-y-3" :class="isEnded(m) ? 'opacity-80' : ''">
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <h4 class="font-extrabold text-lg break-words" x-text="m.name"></h4>
+                  <div class="text-sm text-stone-500 break-words" x-show="m.dose" x-text="m.dose"></div>
+                </div>
+                <span class="text-xs font-bold rounded-full px-3 py-1 whitespace-nowrap"
+                      :class="isEnded(m) ? 'bg-orange-50 text-stone-500' : 'bg-green-100 text-green-700'"
+                      x-text="isEnded(m) ? t('dm_ended') : (m.end ? t('dm_until', {d: m.end}) : t('dm_longterm'))"></span>
+              </div>
+              <div class="flex flex-wrap gap-2 items-center">
+                <span class="text-xs text-stone-500" x-text="t('dm_n_times', {n: m.times.length})"></span>
+                <template x-for="tm in sortedTimes(m)" :key="tm">
+                  <span class="text-xs font-bold bg-orange-100 text-orange-600 rounded-full px-2 py-0.5" x-text="tm"></span>
+                </template>
+              </div>
+              <div class="text-sm" x-text="rate7Text(m)"></div>
+              <div>
+                <span class="lbl" x-text="t('dm_hist')"></span>
+                <div class="flex gap-1 overflow-x-auto pb-1">
+                  <template x-for="d in histDays" :key="d">
+                    <div class="flex flex-col items-center gap-1 min-w-[26px]">
+                      <template x-for="tm in sortedTimes(m)" :key="tm">
+                        <div class="w-4 h-4 rounded" :class="cellCls(slotState(pet, m, d, tm))" :title="d + ' ' + tm"></div>
+                      </template>
+                      <div class="text-[10px] text-stone-400" x-text="d.slice(8)"></div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+              <p class="text-sm text-stone-500 whitespace-pre-wrap" x-show="m.note" x-text="m.note"></p>
+              <div class="flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-soft" @click="editDm(m)" x-text="t('edit')"></button>
+                <button type="button" class="btn btn-soft" @click="delDm(m.id)" x-text="t('delete')"></button>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- ---- 3b. 皮下水 ---- -->
+        <div x-show="msub==='fluids'" class="space-y-4">
+
+          <!-- 計劃 -->
+          <div class="card p-5 space-y-3">
+            <div class="flex items-center justify-between gap-2">
+              <h3 class="font-extrabold text-lg" x-text="'💧 ' + t('fl_plan')"></h3>
+              <button type="button" class="btn btn-soft !py-1 text-sm" x-show="!planEdit" @click="openPlan()" x-text="pet.fluidPlan ? t('fl_edit_plan') : t('fl_set_plan')"></button>
+            </div>
+            <template x-if="!planEdit && pet.fluidPlan">
+              <div class="text-sm space-y-1">
+                <p class="font-bold" x-text="planSummary(pet.fluidPlan)"></p>
+                <p class="text-stone-500" x-show="pet.fluidPlan.fluid" x-text="pet.fluidPlan.fluid"></p>
+                <p class="text-xs text-stone-400" x-text="perKgText(pet, pet.fluidPlan.perDose)"></p>
+              </div>
+            </template>
+            <p class="text-sm text-stone-400" x-show="!planEdit && !pet.fluidPlan" x-text="t('fl_plan_none')"></p>
+
+            <template x-if="planEdit">
+              <form class="space-y-3" @submit.prevent="savePlan()">
+                <label class="flex items-center gap-2 text-sm font-bold">
+                  <input type="checkbox" class="w-5 h-5" x-model="planForm.on">
+                  <span x-text="t('fl_on')"></span>
+                </label>
+                <div><label class="lbl" x-text="t('fl_fluid')"></label>
+                  <input class="inp" list="fluidList" x-model="planForm.fluid" :placeholder="t('ph_fluid')">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div><label class="lbl" x-text="t('fl_per')"></label><input type="number" step="0.1" min="0" inputmode="decimal" class="inp" required x-model="planForm.perDose"></div>
+                  <div>
+                    <label class="lbl" x-text="t('fl_mode')"></label>
+                    <select class="inp" x-model="planForm.mode">
+                      <option value="daily" x-text="t('fl_mode_daily')"></option>
+                      <option value="interval" x-text="t('fl_mode_int')"></option>
+                    </select>
+                  </div>
+                </div>
+                <div x-show="planForm.mode==='daily'">
+                  <label class="lbl" x-text="t('fl_times')"></label>
+                  <div class="space-y-2">
+                    <template x-for="(tm, i) in planForm.times" :key="i">
+                      <div class="flex items-center gap-2">
+                        <input type="time" class="inp" x-model="planForm.times[i]">
+                        <button type="button" class="btn btn-soft !px-3" x-show="planForm.times.length>1" @click="planForm.times.splice(i,1)">✕</button>
+                      </div>
+                    </template>
+                  </div>
+                  <button type="button" class="btn btn-soft mt-2 text-sm" @click="planForm.times.push('18:00')" x-text="t('dm_add_time')"></button>
+                </div>
+                <div x-show="planForm.mode==='interval'" class="grid grid-cols-2 gap-3">
+                  <div><label class="lbl" x-text="t('fl_int')"></label><input type="number" min="1" inputmode="numeric" class="inp" x-model="planForm.intervalDays"></div>
+                  <div><label class="lbl" x-text="t('fl_time1')"></label><input type="time" class="inp" x-model="planForm.times[0]"></div>
+                </div>
+                <div><label class="lbl" x-text="t('fl_start')"></label><input type="date" class="inp" required x-model="planForm.start"></div>
+                <div class="flex gap-2 flex-wrap">
+                  <button type="submit" class="btn btn-main flex-1" x-text="t('save')"></button>
+                  <button type="button" class="btn btn-soft" @click="planEdit=false" x-text="t('cancel')"></button>
+                  <button type="button" class="btn btn-soft" x-show="pet.fluidPlan" @click="delPlan()" x-text="t('delete')"></button>
+                </div>
+              </form>
+            </template>
+            <datalist id="fluidList"><option value="乳酸林格氏液 (Lactated Ringer's)"><option value="生理鹽水 (Normal saline)"></datalist>
+          </div>
+
+          <!-- 統計 -->
+          <div class="card p-5 space-y-3">
+            <div class="grid grid-cols-3 gap-2 text-center text-sm">
+              <div class="bg-orange-50 rounded-xl p-2">
+                <span class="lbl" x-text="t('fl_today')"></span>
+                <b x-text="fluidStats.todayTotal + ' ml'"></b>
+                <div class="text-xs text-stone-400" x-text="perKgText(pet, fluidStats.todayTotal)"></div>
+              </div>
+              <div class="bg-orange-50 rounded-xl p-2">
+                <span class="lbl" x-text="t('fl_week')"></span>
+                <b x-text="fluidStats.week + ' ml'"></b>
+                <div class="text-xs text-stone-400" x-text="perKgText(pet, fluidStats.week)"></div>
+              </div>
+              <div class="bg-orange-50 rounded-xl p-2">
+                <span class="lbl" x-text="t('fl_avg')"></span>
+                <b x-text="fluidStats.avg + ' ml'"></b>
+                <div class="text-xs text-stone-400" x-text="perKgText(pet, fluidStats.avg)"></div>
+              </div>
+            </div>
+            <p class="text-sm" x-show="fluidStats.last" x-text="t('fl_last') + (fluidStats.last ? (fluidStats.last.date + ' ' + (fluidStats.last.time || '') + ' · ' + fluidStats.last.ml + ' ml') : '')"></p>
+            <p class="text-sm font-bold" x-show="fluidNext" :class="fluidNext && fluidNext.days < 0 ? 'text-red-600' : 'text-stone-600'"
+               x-text="fluidNext ? (t('fl_next') + fluidNext.date + (fluidNext.days < 0 ? ' · ' + t('fl_overdue', {n: -fluidNext.days}) : '')) : ''"></p>
+            <div class="flex gap-2 flex-wrap">
+              <button type="button" class="btn btn-main" @click="openFluid({petId: pet.id})" x-text="t('fl_record')"></button>
+              <button type="button" class="btn btn-soft" @click="exportCalendar()" x-text="t('cal_export')"></button>
+            </div>
+          </div>
+
+          <!-- 歷史 -->
+          <p class="text-center text-stone-400 py-4" x-show="!pet.fluids.length" x-text="t('no_fluids')"></p>
+          <template x-for="g in fluidDays" :key="g.date">
+            <div class="card p-4">
+              <div class="flex items-center justify-between gap-2 mb-1">
+                <b x-text="g.date"></b>
+                <span class="text-sm font-bold text-orange-500" x-text="t('fl_day_total', {ml: g.total}) + ' ' + perKgText(pet, g.total)"></span>
+              </div>
+              <template x-for="r in g.items" :key="r.id">
+                <div class="flex items-start justify-between gap-2 py-2 border-b border-orange-50 last:border-0">
+                  <div class="min-w-0">
+                    <template x-if="!r.skipped">
+                      <div>
+                        <b x-text="(r.time || '') + '  ' + r.ml + ' ml'"></b>
+                        <span class="text-xs text-stone-400" x-text="perKgText(pet, r.ml)"></span>
+                      </div>
+                    </template>
+                    <template x-if="r.skipped">
+                      <div class="font-bold text-stone-500" x-text="(r.time || '') + '  ⏭ ' + t('fl_skipped_rec')"></div>
+                    </template>
+                    <div class="text-xs text-stone-500 break-words" x-show="r.fluid || r.site" x-text="[r.fluid, r.site ? lbl('sx_', r.site) : ''].filter(Boolean).join(' · ')"></div>
+                    <div class="text-xs text-stone-500 whitespace-pre-wrap break-words" x-show="r.note" x-text="r.note"></div>
+                  </div>
+                  <div class="flex gap-1 shrink-0">
+                    <button type="button" class="btn btn-soft !px-3 !py-1 text-sm" @click="openFluid({petId: pet.id, rec: r})" x-text="t('edit')"></button>
+                    <button type="button" class="btn btn-soft !px-3 !py-1 text-sm" @click="delFluid(r.id)" x-text="t('delete')"></button>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </template>
+          <button type="button" class="btn btn-soft w-full" x-show="!fluidShowAll && fluidAllDays.length > 30" @click="fluidShowAll=true" x-text="t('fl_show_all')"></button>
+        </div>
+
+        <!-- ---- 3c. 驅蟲提醒 ---- -->
         <div x-show="msub==='care'" class="space-y-4">
           <form class="card p-5 space-y-3" @submit.prevent="saveMed()">
             <h3 class="font-extrabold text-lg" x-text="mForm.id ? '✏️ ' + t('med_edit_title') : '🛡️ ' + t('med_add_title')"></h3>
@@ -240,7 +502,7 @@
           </template>
         </div>
 
-        <!-- ---- 3b. 用藥紀錄（處方／保健品） ---- -->
+        <!-- ---- 3d. 用藥紀錄（處方／保健品） ---- -->
         <div x-show="msub==='rx'" class="space-y-4">
           <form class="card p-5 space-y-3" @submit.prevent="saveRx()">
             <h3 class="font-extrabold text-lg" x-text="rxForm.id ? '✏️ ' + t('rx_edit_title') : '💊 ' + t('rx_add_title')"></h3>
@@ -383,7 +645,7 @@
           </template>
         </div>
 
-        <!-- ---- 3c. 檢查報告 ---- -->
+        <!-- ---- 3e. 檢查報告 ---- -->
         <div x-show="msub==='reports'" class="space-y-4">
           <form class="card p-5 space-y-3" @submit.prevent="saveReport()">
             <h3 class="font-extrabold text-lg" x-text="rpForm.id ? '✏️ ' + t('rp_edit_title') : '🔬 ' + t('rp_add_title')"></h3>
@@ -458,7 +720,7 @@
           </template>
         </div>
 
-        <!-- ---- 3d. 疫苗 ---- -->
+        <!-- ---- 3f. 疫苗 ---- -->
         <div x-show="msub==='vaccine'" class="space-y-4">
           <form class="card p-5 space-y-3" @submit.prevent="saveVaccine()">
             <h3 class="font-extrabold text-lg" x-text="'💉 ' + t('vax_title')"></h3>
@@ -489,7 +751,7 @@
           </template>
         </div>
 
-        <!-- ---- 3e. 異常事件 ---- -->
+        <!-- ---- 3g. 異常事件 ---- -->
         <div x-show="msub==='events'" class="space-y-4">
           <form class="card p-5 space-y-3" @submit.prevent="saveEvent()">
             <h3 class="font-extrabold text-lg" x-text="'📝 ' + t('ev_title')"></h3>
@@ -577,8 +839,12 @@
         <p class="text-center text-stone-400 py-2" x-show="!pet.lifeLogs.length" x-text="t('no_life')"></p>
       </section>
 
-      <!-- ========== 5. 更多（診所、備份） ========== -->
+      <!-- ========== 5. 更多（說明、診所、備份） ========== -->
       <section x-show="tab==='more'" class="space-y-4">
+
+        <button type="button" class="card p-4 w-full text-left font-extrabold flex items-center justify-between" @click="guideModal=true">
+          <span x-text="'📖 ' + t('guide_title')"></span><span>›</span>
+        </button>
 
         <!-- 主診診所 -->
         <div class="card p-5 space-y-3">
@@ -714,8 +980,44 @@
     </form>
   </div>
 
-  <!-- 確認視窗 -->
-  <div class="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" x-show="confirmBox" x-transition.opacity @click.self="confirmBox=null">
+  <!-- 皮下水記錄 Modal -->
+  <div class="fixed inset-0 z-40 bg-black/30 flex items-end sm:items-center justify-center p-0 sm:p-4" x-show="fluidModal" x-transition.opacity @click.self="fluidModal=false">
+    <form class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 space-y-3 max-h-[92vh] overflow-y-auto" @submit.prevent="saveFluid()">
+      <h3 class="font-extrabold text-lg" x-text="fForm.id ? '✏️ ' + t('fl_rec_edit') : '💧 ' + t('fl_rec_title')"></h3>
+      <div class="text-sm font-bold text-orange-400" x-text="fPetName()"></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="lbl" x-text="t('date')"></label><input type="date" class="inp" required x-model="fForm.date"></div>
+        <div><label class="lbl" x-text="t('fl_time')"></label><input type="time" class="inp" x-model="fForm.time"></div>
+      </div>
+      <div>
+        <label class="lbl" x-text="t('fl_ml')"></label>
+        <input type="number" step="0.1" min="0" inputmode="decimal" class="inp" required x-model="fForm.ml">
+        <p class="text-xs text-stone-400 mt-1" x-text="fPerKg()"></p>
+      </div>
+      <div><label class="lbl" x-text="t('fl_fluid')"></label><input class="inp" list="fluidList" x-model="fForm.fluid" :placeholder="t('ph_fluid')"></div>
+      <div>
+        <label class="lbl" x-text="t('fl_site')"></label>
+        <select class="inp" x-model="fForm.site">
+          <option value="" x-text="t('sx_none')"></option>
+          <template x-for="s in sites" :key="s"><option :value="s" x-text="lbl('sx_', s)"></option></template>
+        </select>
+        <p class="text-xs text-stone-400 mt-1" x-show="fLastSite()" x-text="t('fl_site_last', {s: fLastSite()})"></p>
+      </div>
+      <div><label class="lbl" x-text="t('fl_note')"></label><textarea rows="2" class="inp" x-model="fForm.note" :placeholder="t('ph_flnote')"></textarea></div>
+      <div class="flex gap-2 pt-1">
+        <button class="btn btn-main flex-1" type="submit" x-text="t('save')"></button>
+        <button type="button" class="btn btn-soft" @click="fluidModal=false" x-text="t('cancel')"></button>
+      </div>
+    </form>
+  </div>
+
+  <!-- 跳過原因 Modal -->
+  <div class="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" x-show="skipBox" x-transition.opacity @click.self="skipBox=null">
+    <form class="bg-white rounded-3xl p-5 w-full max-w-sm space-y-3" style="color:var(--fg)" @submit.prevent="confirmSkip()">
+      <h3 class="font-extrabold text-lg" x-text="'⏭ ' + t('skip_title')"></h3>
+      <p class="text-sm text-stone-500" x-text="skipBox ? (skipBox.petName + ' · ' + skipBox.title + ' · ' + skipBox.time) : ''"></p>
+      <div><label class="lbl" x-text="t('skip_reason')"
+<div class="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" x-show="confirmBox" x-transition.opacity @click.self="confirmBox=null">
     <div class="bg-white rounded-3xl p-5 w-full max-w-sm space-y-4 text-center" style="color:var(--fg)">
       <div class="text-4xl">🐾</div>
       <p class="font-bold" x-text="confirmBox ? confirmBox.msg : ''"></p>
@@ -726,30 +1028,56 @@
     </div>
   </div>
 
-  <!-- 相片放大 -->
-  <div class="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-3" x-show="lightbox" x-transition.opacity @click="lightbox=null">
+<!-- 使用說明 -->
+<div class="fixed inset-0 z-[55] bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4" x-show="guideModal" x-transition.opacity @click.self="guideModal=false">
+    <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 space-y-3 max-h-[92vh] overflow-y-auto" style="color:var(--fg)">
+      <h3 class="font-extrabold text-lg" x-text="'📖 ' + t('guide_title')"></h3>
+      <ol class="space-y-2 text-sm">
+        <template x-for="k in guideKeys" :key="k"><li class="bg-orange-50 rounded-2xl p-3 break-words" x-text="t(k)"></li></template>
+      </ol>
+      <button type="button" class="btn btn-main w-full" @click="guideModal=false" x-text="t('close')"></button>
+    </div>
+  </div>
+
+<!-- 首次歡迎 -->
+<div class="fixed inset-0 z-[58] bg-black/40 flex items-center justify-center p-4" x-show="welcomeModal" x-transition.opacity>
+    <div class="bg-white rounded-3xl p-5 w-full max-w-sm space-y-3" style="color:var(--fg)">
+      <div class="text-4xl text-center">🐾</div>
+      <h3 class="font-extrabold text-lg text-center" x-text="t('w_title')"></h3>
+      <ul class="space-y-2 text-sm">
+        <li class="bg-orange-50 rounded-2xl p-3" x-text="'💾 ' + t('w_p1')"></li>
+        <li class="bg-orange-50 rounded-2xl p-3" x-text="'🔔 ' + t('w_p2')"></li>
+        <li class="bg-orange-50 rounded-2xl p-3" x-text="'🩺 ' + t('w_p3')"></li>
+      </ul>
+      <div class="flex gap-2">
+        <button type="button" class="btn btn-soft flex-1" @click="closeWelcome(true)" x-text="t('w_more')"></button>
+        <button type="button" class="btn btn-main flex-1" @click="closeWelcome(false)" x-text="t('w_ok')"></button>
+      </div>
+    </div>
+  </div>
+
+<!-- 相片放大 -->
+<div class="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-3" x-show="lightbox" x-transition.opacity @click="lightbox=null">
     <img :src="lightbox ? src(lightbox) : null" class="max-w-full max-h-full object-contain rounded-lg">
     <button type="button" class="absolute top-4 right-4 bg-white/90 text-stone-700 rounded-full w-10 h-10 font-bold" @click.stop="lightbox=null" :aria-label="t('close')">✕</button>
   </div>
 
-  <div class="fixed left-1/2 -translate-x-1/2 z-[70] rounded-full px-4 py-2 text-sm font-bold shadow-lg max-w-[90vw] text-center" style="bottom:5.5rem;background:var(--fg);color:#fff" x-show="toastMsg" x-transition x-text="toastMsg"></div>
+<div class="fixed left-1/2 -translate-x-1/2 z-[70] rounded-full px-4 py-2 text-sm font-bold shadow-lg max-w-[90vw] text-center" style="bottom:5.5rem;background:var(--fg);color:#fff" x-show="toastMsg" x-transition x-text="toastMsg"></div>
 </div>
-
 <script>
-// 儲存 key 與舊版相同，所以舊資料會自動沿用
-const KEY = 'catHealthTracker_standalone_v1';
+const KEY = 'catHealthTracker_standalone_v1';   // 與舊版相同，舊資料自動沿用
 const LANG_KEY = 'petTracker_lang';
 const UNIT_KEY = 'petTracker_unit';
+const WELCOME_KEY = 'petTracker_welcome_v2';
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
-// 圖表放喺 Alpine 外面，避免被 Alpine 包成 Proxy 而畫唔出
-let weightChart = null;
+let weightChart = null;                 // 放喺 Alpine 外面，避免被 Proxy 包住
+const MAX_FILES = 10;
+const MAX_PDF = 5 * 1024 * 1024;
+const GRACE_MIN = 120;                  // 超過 2 小時未記錄 = 逾時
+const requested = new Set();
 
-const MAX_FILES = 10;                 // 每項紀錄最多檔案數
-const MAX_PDF = 5 * 1024 * 1024;      // PDF 上限 5MB
-const requested = new Set();          // 已經開始載入嘅檔案 id
-
-/* ---------- IndexedDB（相片／PDF 儲存） ---------- */
+/* ---------- IndexedDB ---------- */
 const DB_NAME = 'petTrackerFiles', STORE = 'files';
 let dbPromise = null;
 function openDB() {
@@ -762,31 +1090,13 @@ function openDB() {
   });
   return dbPromise;
 }
-async function idbPut(rec) {
-  const db = await openDB();
-  return new Promise((res, rej) => { const tx = db.transaction(STORE, 'readwrite'); tx.objectStore(STORE).put(rec); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
-}
-async function idbGet(id) {
-  const db = await openDB();
-  return new Promise((res, rej) => { const q = db.transaction(STORE).objectStore(STORE).get(id); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
-}
-async function idbDel(id) {
-  const db = await openDB();
-  return new Promise((res, rej) => { const tx = db.transaction(STORE, 'readwrite'); tx.objectStore(STORE).delete(id); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
-}
-async function idbAll() {
-  const db = await openDB();
-  return new Promise((res, rej) => { const q = db.transaction(STORE).objectStore(STORE).getAll(); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
-}
-async function idbClear() {
-  const db = await openDB();
-  return new Promise((res, rej) => { const tx = db.transaction(STORE, 'readwrite'); tx.objectStore(STORE).clear(); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
-}
-
+async function idbPut(rec) { const db = await openDB(); return new Promise((res, rej) => { const tx = db.transaction(STORE, 'readwrite'); tx.objectStore(STORE).put(rec); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); }); }
+async function idbGet(id) { const db = await openDB(); return new Promise((res, rej) => { const q = db.transaction(STORE).objectStore(STORE).get(id); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
+async function idbDel(id) { const db = await openDB(); return new Promise((res, rej) => { const tx = db.transaction(STORE, 'readwrite'); tx.objectStore(STORE).delete(id); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); }); }
+async function idbAll() { const db = await openDB(); return new Promise((res, rej) => { const q = db.transaction(STORE).objectStore(STORE).getAll(); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
+async function idbClear() { const db = await openDB(); return new Promise((res, rej) => { const tx = db.transaction(STORE, 'readwrite'); tx.objectStore(STORE).clear(); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); }); }
 /* ---------- 檔案工具 ---------- */
-function readAsDataURL(file) {
-  return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(file); });
-}
+function readAsDataURL(file) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(file); }); }
 function compressImage(file, max = 1200, q = 0.8) {
   return new Promise((res, rej) => {
     const r = new FileReader();
@@ -798,9 +1108,7 @@ function compressImage(file, max = 1200, q = 0.8) {
         const s = Math.min(1, max / Math.max(img.width, img.height));
         const w = Math.round(img.width * s), h = Math.round(img.height * s);
         const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
-        const ctx = cv.getContext('2d');
-        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
-        ctx.drawImage(img, 0, 0, w, h);
+        const ctx = cv.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); ctx.drawImage(img, 0, 0, w, h);
         res(cv.toDataURL('image/jpeg', q));
       };
       img.src = e.target.result;
@@ -815,7 +1123,6 @@ function dataUrlToBlob(u) {
   return new Blob([arr], { type: mime });
 }
 
-// 舊版中文資料 → 新版通用代碼（自動轉換，唔會遺失資料）
 const LEGACY = {
   '杜虱/防虱藥': 'flea', '心絲蟲藥': 'heartworm', '體內杜蟲藥': 'dewormer', '長期慢性病藥物': 'chronic',
   '嘔吐': 'vomit', '軟便/腹瀉': 'diarrhea', '食慾不振': 'appetite', '精神不佳': 'lethargy', '咳嗽/打噴嚏': 'cough', '其他': 'other',
@@ -824,7 +1131,6 @@ const LEGACY = {
 };
 const norm = v => LEGACY[v] || v;
 
-// 疫苗建議（只係輸入建議，仍可自由輸入）
 const VACC = {
   cat:    { zh: ['三合一', '四合一', '狂犬病', '貓白血病'], en: ['FVRCP', 'Rabies', 'FeLV'] },
   dog:    { zh: ['多合一 (DHPP)', '狂犬病', '犬舍咳 (Bordetella)', '鈎端螺旋體'], en: ['DHPP', 'Rabies', 'Bordetella', 'Leptospirosis'] },
@@ -836,7 +1142,7 @@ const I18N = {
   zh: {
     app_title: '寵物健康記錄器', saved_note: '📱 資料已自動儲存在手機本機 (獨立 App 模式)',
     tab_home: '主頁', tab_weight: '體重', tab_medical: '醫療', tab_life: '生活', tab_more: '更多',
-    sub_care: '驅蟲提醒', sub_rx: '用藥', sub_reports: '檢查報告', sub_vaccine: '疫苗', sub_events: '異常事件',
+    sub_daily: '每日藥物', sub_fluids: '皮下水', sub_care: '驅蟲提醒', sub_rx: '用藥', sub_reports: '檢查報告', sub_vaccine: '疫苗', sub_events: '異常事件',
     no_pet: '還沒有寵物資料，先來新增一位家人吧！', add_pet: '＋ 新增寵物', load_demo: '載入範例資料',
     edit: '編輯', delete: '刪除', cancel: '取消', ok: '確定', save: '儲存', add: '新增', done: '完成', save_changes: '儲存修改', close: '關閉',
     birth: '出生日期', gender: '性別', species: '物種', breed: '品種', chip: '晶片號碼', eg: '例如：',
@@ -847,6 +1153,30 @@ const I18N = {
     backup_ph: '備份碼會顯示在這裡；還原時把備份碼貼在這裡', copy_backup: '複製備份碼', restore_backup: '從備份碼還原',
     full_title: '完整備份（連相片／檔案）', full_desc: '匯出成一個檔案，換手機或定期備份時使用。匯入會取代目前所有資料。',
     export_full: '匯出完整備份檔', import_full: '匯入備份檔',
+    // 今日待辦／每日藥物
+    today_title: '今日待辦', btn_given: '✅ 已餵', btn_injected: '✅ 已打', btn_skip: '跳過', btn_undo: '↩ 復原',
+    sl_done: '✅ 已完成', sl_skipped: '⏭ 已跳過', sl_upcoming: '⏳ 稍後', sl_due: '🟡 時間到', sl_late: '🔴 已逾時', sl_missed: '🔴 未記錄', sl_future: '未到日期', sl_na: '',
+    skip_title: '跳過這次', skip_reason: '原因（可留空）', ph_skip: '例如：不肯食藥、嘔吐',
+    dm_slots: '服藥安排', dm_today: '今日', dm_no_slots: '這天沒有安排服藥', dm_add: '新增每日藥物', dm_edit: '編輯每日藥物',
+    dm_name: '藥名', ph_dmname: '例如：Prednisolone', dm_dose: '劑量', ph_dmdose: '例如：半粒、1ml',
+    dm_times: '服藥時間', dm_add_time: '＋ 加時間', dm_start: '開始日期', dm_end: '完結日期（留空＝長期）',
+    no_daily: '還沒有每日藥物 💊', dm_n_times: '每日 {n} 次', dm_longterm: '長期', dm_until: '至 {d}', dm_ended: '已完結',
+    dm_rate7: '近 7 日：完成 {d}/{t}，跳過 {s}', dm_hist: '近 14 日', dm_legend: '綠＝完成　黃＝跳過　紅＝未記錄　灰＝無安排',
+    // 皮下水
+    fl_title: '皮下水', fl_plan: '治療計劃', fl_plan_none: '未設定計劃，你可以只記錄每次打針；設定計劃後會有今日待辦同提示。',
+    fl_set_plan: '設定計劃', fl_edit_plan: '編輯計劃', fl_fluid: '液體種類', ph_fluid: '例如：乳酸林格氏液',
+    fl_per: '每次份量 (ml)', fl_mode: '頻率', fl_mode_daily: '每日打 N 次', fl_mode_int: '每隔 N 日打一次',
+    fl_times: '打針時間', fl_int: '間隔（日）', fl_time1: '時間', fl_start: '開始日期', fl_on: '啟用計劃（待辦同提示）',
+    fl_sum_daily: '每次 {ml} ml，每日 {n} 次（{times}）', fl_sum_int: '每次 {ml} ml，每隔 {n} 日一次（{time}）', fl_off: '（計劃已停用）',
+    fl_today: '今日合計', fl_week: '近 7 日', fl_avg: '平均每日', fl_last: '上次：', fl_next: '下次：', fl_overdue: '已逾期 {n} 日',
+    fl_record: '＋ 記錄一次', fl_rec_title: '記錄皮下水', fl_rec_edit: '編輯皮下水記錄', fl_ml: '份量 (ml)', fl_time: '時間',
+    fl_site: '注射位置', fl_site_last: '上次位置：{s}', fl_note: '反應／備註', ph_flnote: '例如：很配合、輕微滲漏',
+    no_fluids: '還沒有皮下水記錄 💧', fl_skipped_rec: '已跳過', fl_show_all: '顯示全部', fl_day_total: '合計 {ml} ml', perkg: '≈ {v} ml/kg',
+    sx_none: '未填寫', sx_l_shoulder: '左肩', sx_r_shoulder: '右肩', sx_l_flank: '左側腰', sx_r_flank: '右側腰', sx_other: '其他',
+    cal_export: '📅 匯出到日曆', cal_warn: '匯出前請留意：如果之前匯出過，舊嘅日曆事件唔會自動刪除，要喺手機日曆自己刪走，否則會重複提醒。確定匯出？',
+    cal_none: '沒有可匯出的排程（請先設定每日藥物或皮下水計劃）', cal_done: '已匯出，請用日曆開啟並加入', cal_fail: '匯出失敗，請再試',
+    cal_dose: '💊 {pet}：{name}{dose}', cal_fluid: '💧 {pet}：皮下水 {ml}ml',
+    // 驅蟲
     med_edit_title: '編輯驅蟲／預防藥', med_add_title: '新增驅蟲／預防藥', med_type: '藥物類型',
     mt_flea: '杜虱/防虱藥', mt_heartworm: '心絲蟲藥', mt_dewormer: '體內杜蟲藥', mt_chronic: '長期慢性病藥物',
     med_name: '藥物名稱（如 Revolution、Bravecto）', ph_med: '例如：Revolution',
@@ -854,23 +1184,19 @@ const I18N = {
     no_meds: '還沒有藥物紀錄 🐟', cycle_short: '週期', last: '上次', next: '下次', fed_today: '✅ 今日已餵藥',
     st_over: '🔴 已逾期', st_soon: '🟡 即將到期', st_ok: '🟢 正常',
     d_over: '已逾期 {n} 天，請盡快餵藥！', d_today: '今天到期！', d_left: '還有 {n} 天到期', d_ok: '還有 {n} 天才需要下次服藥',
-    rx_add_title: '新增用藥／保健品', rx_edit_title: '編輯用藥紀錄',
-    rx_name: '藥名／保健品名稱', ph_rxname: '例如：Prednisolone、魚油',
-    rx_kind: '類別', k_rx: '處方藥', k_supp: '保健品',
-    rx_start: '開始日期', rx_dose: '劑量', ph_dose: '例如：半粒、1ml', rx_freq: '次數', ph_freq: '例如：每日兩次',
-    rx_days: '食幾多日（留空＝長期服用）', ph_days: '例如：7', rx_doctor: '處方獸醫', ph_rxdoc: '保健品可留空',
-    rx_reason: '用藥原因', ph_reason: '例如：皮膚炎、關節保養',
-    rx_remind: '完結前提醒', rx_remind_days: '提前', days_unit: '日',
-    rx_active: '進行中', rx_ended: '已完結', rx_longterm: '🔵 長期服用', rx_last: '最後一日',
-    rx_going: '🟢 進行中', rx_lastday_l: '🟡 今日最後一日', rx_ended_l: '⚪ 已完結',
+    // 用藥
+    rx_add_title: '新增用藥／保健品', rx_edit_title: '編輯用藥紀錄', rx_name: '藥名／保健品名稱', ph_rxname: '例如：Prednisolone、魚油',
+    rx_kind: '類別', k_rx: '處方藥', k_supp: '保健品', rx_start: '開始日期', rx_dose: '劑量', ph_dose: '例如：半粒、1ml',
+    rx_freq: '次數', ph_freq: '例如：每日兩次', rx_days: '食幾多日（留空＝長期服用）', ph_days: '例如：7',
+    rx_doctor: '處方獸醫', ph_rxdoc: '保健品可留空', rx_reason: '用藥原因', ph_reason: '例如：皮膚炎、關節保養',
+    rx_remind: '完結前提醒', rx_remind_days: '提前', days_unit: '日', rx_active: '進行中', rx_ended: '已完結',
+    rx_longterm: '🔵 長期服用', rx_last: '最後一日', rx_going: '🟢 進行中', rx_lastday_l: '🟡 今日最後一日', rx_ended_l: '⚪ 已完結',
     rx_left: '尚餘 {n} 日', rx_lastday: '今天是最後一日', rx_endedn: '已完結 {n} 日',
-    rx_remind_on: '🔔 提醒：開', rx_remind_off: '🔕 提醒：關',
-    rx_reason_l: '原因：', rx_doctor_l: '處方獸醫：', no_rx: '還沒有用藥紀錄 💊',
+    rx_remind_on: '🔔 提醒：開', rx_remind_off: '🔕 提醒：關', rx_reason_l: '原因：', rx_doctor_l: '處方獸醫：', no_rx: '還沒有用藥紀錄 💊',
     rp_add_title: '新增檢查報告', rp_edit_title: '編輯檢查報告', rp_type: '檢查類型',
     rt_blood: '驗血', rt_xray: 'X 光', rt_ultrasound: '超聲波', rt_urine: '尿液／糞便檢查', rt_other: '其他',
     rp_clinic: '檢查診所／機構', rp_summary: '結果摘要', ph_summary: '例如：腎指數稍高', rp_opinion: '獸醫意見', ph_opinion: '例如：兩星期後覆檢',
-    no_reports: '還沒有檢查報告 🔬',
-    photos: '相片', files_lbl: '相片／PDF 檔案',
+    no_reports: '還沒有檢查報告 🔬', photos: '相片', files_lbl: '相片／PDF 檔案',
     hint_photos: '相片會自動壓縮，每項最多 10 張', hint_files: '相片會自動壓縮；PDF 每個最多 5MB；每項最多 10 個檔案',
     w_edit: '編輯體重', w_add: '記錄體重', date: '日期', weight: '體重', note: '備註', ph_wnote: '例如：剛吃完飯', unit: '單位',
     trend: '體重變化趨勢', trend_empty: '新增體重紀錄後會顯示折線圖', history: '歷史紀錄', no_weights: '還沒有體重紀錄 🐟',
@@ -892,24 +1218,40 @@ const I18N = {
     c_delmed: '確定刪除這筆藥物紀錄？', c_delw: '確定刪除這筆體重紀錄？', c_delvax: '確定刪除這筆疫苗紀錄？',
     c_delev: '確定刪除這筆事件？', c_dellife: '確定刪除這筆生活紀錄？', c_delvet: '確定刪除這間診所資料？',
     c_delrx: '確定刪除這筆用藥紀錄？', c_delrp: '確定刪除這份檢查報告？',
+    c_deldm: '確定刪除這款每日藥物？相關嘅打剔紀錄亦會一併刪除。', c_delfl: '確定刪除這筆皮下水記錄？',
+    c_delplan: '確定刪除皮下水計劃？（已有記錄不會刪除）', c_undofl: '確定撤銷這筆皮下水記錄？',
     c_import: '匯入會取代目前所有資料（包括相片和檔案），確定嗎？',
     t_copied: '已複製備份碼，請貼到備忘錄保存', t_manual: '請長按文字框，全選後手動複製',
     t_badfmt: '備份碼格式不正確，請重新貼上完整內容', t_invalid: '這不是有效的備份碼', t_restored: '已還原 {n} 隻寵物的資料',
     t_quota: '儲存空間不足，請嘗試移除較大的相片', t_restfail: '儲存空間不足，還原失敗',
     t_cycle: '請輸入有效的服藥週期', t_wpos: '請輸入有效的體重', t_days: '請輸入有效的日數',
+    t_ml: '請輸入有效的份量 (ml)', t_times: '請至少設定一個有效時間', t_dates: '完結日期不可早於開始日期', t_int: '請輸入有效的間隔日數',
     t_maxfiles: '每項最多 {n} 個檔案', t_toobig: '檔案太大（PDF 上限 5MB）', t_imgonly: '這裡只可以上載相片', t_badtype: '不支援的檔案類型',
     t_filefail: '檔案處理失敗，請再試', t_missing: '找不到檔案（可能沒有包含在備份內）',
     t_exported: '已匯出備份檔', t_exportfail: '匯出失敗，請再試', t_imported: '已匯入 {n} 隻寵物的資料', t_importfail: '匯入失敗，檔案格式不正確',
     al_med_over: '⚠️ {pet} 的 {name} 已逾期 {n} 天！請盡快餵藥', al_med_today: '⏰ {pet} 的 {name} 今天到期，記得餵藥！', al_med_soon: '⏰ {pet} 的 {name} 將在 {n} 天後到期',
     al_vax_over: '⚠️ {pet} 的 {name} 疫苗已逾期 {n} 天！請盡快預約打針', al_vax_today: '⏰ {pet} 的 {name} 疫苗今天要打針！', al_vax_soon: '⏰ {pet} 的 {name} 疫苗將在 {n} 天後到期',
     al_rx_over: '⚠️ {pet} 的 {name} 療程已完結 {n} 天，需要續藥或覆診嗎？', al_rx_today: '⏰ {pet} 的 {name} 今天是療程最後一日', al_rx_soon: '⏰ {pet} 的 {name} 療程將在 {n} 天後完結',
+    al_dose_due: '⏰ {pet} 的 {name}（{time}）該餵藥了', al_dose_late: '⚠️ {pet} 的 {name}（{time}）已逾時未記錄',
+    al_fl_due: '⏰ {pet} 該打皮下水了（{time}）', al_fl_late: '⚠️ {pet} 的皮下水已逾時未記錄（{time}）', al_fl_overdue: '⚠️ {pet} 的皮下水已逾期 {n} 日',
+    guide_title: '使用說明', w_title: '歡迎使用', w_more: '查看完整說明', w_ok: '知道了',
+    w_p1: '資料只儲存在這部手機，請定期到「更多」匯出完整備份。', w_p2: '提示只會在打開 App 時顯示，關閉後不會響鬧；要響鬧請匯出到日曆。', w_p3: '劑量、次數、皮下水份量全以獸醫指示為準，App 只負責記錄同提示。',
+    g1: '資料只儲存在這部手機的瀏覽器／App 內，不會自動同步到其他裝置，所以建議只用一部手機記錄。',
+    g2: '請定期到「更多」按「匯出完整備份檔」備份。換手機、清除瀏覽器資料前一定要先備份。',
+    g3: 'iPhone 建議用 Safari「加到主畫面」使用，並避免清除 Safari 的網站資料。',
+    g4: '提示只會在打開 App 時顯示（主頁頂部橫幅同今日待辦）。App 關閉後不會自動響鬧。想要響鬧，請在「每日藥物」或「皮下水」頁面用「匯出到日曆」。',
+    g5: '匯出到日曆後，如果更改了服藥／打針時間，要重新匯出，並自行在日曆刪除舊事件，否則會重複提醒。',
+    g6: '每日藥物：時間一到會變黃（該餵藥），超過 2 小時未記錄會變紅。漏打剔可以在「每日藥物」揀日期補記。更改服藥時間後，過往日子會按新時間顯示。',
+    g7: '皮下水：每次實際份量、位置都可以記錄，同一日可以記錄多次。ml/kg 按最新一次體重計算，只供參考。',
+    g8: '劑量、次數、皮下水份量全部以獸醫指示為準。本 App 只負責記錄同提示，不提供醫療建議。',
+    g9: '相片會自動壓縮；PDF 每個上限 5MB。文字備份碼不包含相片同檔案。',
     demo_name: '咪咪', demo_med1: 'Revolution 大寵愛', demo_hw: '心絲蟲預防藥', demo_vax: '三合一',
     demo_ev: '今天早上軟便一次，精神正常。', demo_clinic: '暖暖動物醫院', demo_vet: '王醫師',
   },
   en: {
     app_title: 'Pet Health Tracker', saved_note: '📱 Data is saved automatically on this device (standalone app mode)',
     tab_home: 'Home', tab_weight: 'Weight', tab_medical: 'Medical', tab_life: 'Life', tab_more: 'More',
-    sub_care: 'Parasite care', sub_rx: 'Medication', sub_reports: 'Reports', sub_vaccine: 'Vaccines', sub_events: 'Events',
+    sub_daily: 'Daily meds', sub_fluids: 'Sub-Q fluids', sub_care: 'Parasite care', sub_rx: 'Medication', sub_reports: 'Reports', sub_vaccine: 'Vaccines', sub_events: 'Events',
     no_pet: 'No pets yet. Add your first family member!', add_pet: '＋ Add Pet', load_demo: 'Load sample data',
     edit: 'Edit', delete: 'Delete', cancel: 'Cancel', ok: 'OK', save: 'Save', add: 'Add', done: 'Done', save_changes: 'Save changes', close: 'Close',
     birth: 'Date of birth', gender: 'Sex', species: 'Species', breed: 'Breed', chip: 'Microchip no.', eg: 'e.g. ',
@@ -920,6 +1262,27 @@ const I18N = {
     backup_ph: 'Your backup code appears here; paste a code here to restore', copy_backup: 'Copy backup code', restore_backup: 'Restore from code',
     full_title: 'Full backup (with photos / files)', full_desc: 'Export everything into one file for switching phones or regular backups. Importing replaces all current data.',
     export_full: 'Export full backup', import_full: 'Import backup file',
+    today_title: "Today's To-Do", btn_given: '✅ Given', btn_injected: '✅ Done', btn_skip: 'Skip', btn_undo: '↩ Undo',
+    sl_done: '✅ Done', sl_skipped: '⏭ Skipped', sl_upcoming: '⏳ Later', sl_due: '🟡 Due now', sl_late: '🔴 Overdue', sl_missed: '🔴 Not logged', sl_future: 'Not yet', sl_na: '',
+    skip_title: 'Skip this one', skip_reason: 'Reason (optional)', ph_skip: 'e.g. refused the pill, vomited',
+    dm_slots: 'Schedule', dm_today: 'Today', dm_no_slots: 'No doses scheduled on this day', dm_add: 'Add daily medication', dm_edit: 'Edit daily medication',
+    dm_name: 'Medication', ph_dmname: 'e.g. Prednisolone', dm_dose: 'Dose', ph_dmdose: 'e.g. half a tablet, 1 ml',
+    dm_times: 'Dose times', dm_add_time: '＋ Add time', dm_start: 'Start date', dm_end: 'End date (empty = ongoing)',
+    no_daily: 'No daily medications yet 💊', dm_n_times: '{n}× daily', dm_longterm: 'Ongoing', dm_until: 'Until {d}', dm_ended: 'Finished',
+    dm_rate7: 'Last 7 days: {d}/{t} given, {s} skipped', dm_hist: 'Last 14 days', dm_legend: 'Green = done · Yellow = skipped · Red = not logged · Grey = none',
+    fl_title: 'Sub-Q fluids', fl_plan: 'Treatment plan', fl_plan_none: 'No plan set. You can just log each session; with a plan you get a daily to-do and reminders.',
+    fl_set_plan: 'Set plan', fl_edit_plan: 'Edit plan', fl_fluid: 'Fluid type', ph_fluid: "e.g. Lactated Ringer's",
+    fl_per: 'Amount per session (ml)', fl_mode: 'Frequency', fl_mode_daily: 'N times a day', fl_mode_int: 'Once every N days',
+    fl_times: 'Session times', fl_int: 'Interval (days)', fl_time1: 'Time', fl_start: 'Start date', fl_on: 'Plan active (to-do & reminders)',
+    fl_sum_daily: '{ml} ml per session, {n}× daily ({times})', fl_sum_int: '{ml} ml per session, every {n} day(s) ({time})', fl_off: ' (plan paused)',
+    fl_today: 'Today', fl_week: 'Last 7 days', fl_avg: 'Daily avg', fl_last: 'Last: ', fl_next: 'Next: ', fl_overdue: 'overdue by {n} day(s)',
+    fl_record: '＋ Log a session', fl_rec_title: 'Log fluids', fl_rec_edit: 'Edit fluid record', fl_ml: 'Amount (ml)', fl_time: 'Time',
+    fl_site: 'Injection site', fl_site_last: 'Last site: {s}', fl_note: 'Reaction / notes', ph_flnote: 'e.g. calm, slight leakage',
+    no_fluids: 'No fluid records yet 💧', fl_skipped_rec: 'Skipped', fl_show_all: 'Show all', fl_day_total: 'Total {ml} ml', perkg: '≈ {v} ml/kg',
+    sx_none: 'Not specified', sx_l_shoulder: 'Left shoulder', sx_r_shoulder: 'Right shoulder', sx_l_flank: 'Left flank', sx_r_flank: 'Right flank', sx_other: 'Other',
+    cal_export: '📅 Export to calendar', cal_warn: "Before exporting: if you exported earlier, the old calendar events are not removed automatically. Delete them in your phone's calendar or you'll get duplicate reminders. Export now?",
+    cal_none: 'Nothing to export (set up a daily medication or fluid plan first)', cal_done: 'Exported. Open it with Calendar to add the events', cal_fail: 'Export failed. Please try again',
+    cal_dose: '💊 {pet}: {name}{dose}', cal_fluid: '💧 {pet}: Sub-Q fluids {ml} ml',
     med_edit_title: 'Edit parasite / preventive medication', med_add_title: 'Add parasite / preventive medication', med_type: 'Type',
     mt_flea: 'Flea & tick', mt_heartworm: 'Heartworm', mt_dewormer: 'Dewormer', mt_chronic: 'Long-term medication',
     med_name: 'Medication name (e.g. Revolution, Bravecto)', ph_med: 'e.g. Revolution',
@@ -927,23 +1290,18 @@ const I18N = {
     no_meds: 'No medication records yet 🐟', cycle_short: 'Interval', last: 'Last', next: 'Next', fed_today: '✅ Given today',
     st_over: '🔴 Overdue', st_soon: '🟡 Due soon', st_ok: '🟢 On track',
     d_over: 'Overdue by {n} days. Please give it soon!', d_today: 'Due today!', d_left: 'Due in {n} days', d_ok: 'Next dose in {n} days',
-    rx_add_title: 'Add medication / supplement', rx_edit_title: 'Edit medication record',
-    rx_name: 'Medication / supplement name', ph_rxname: 'e.g. Prednisolone, fish oil',
-    rx_kind: 'Category', k_rx: 'Prescription', k_supp: 'Supplement',
-    rx_start: 'Start date', rx_dose: 'Dose', ph_dose: 'e.g. half a tablet, 1 ml', rx_freq: 'Frequency', ph_freq: 'e.g. twice a day',
-    rx_days: 'Number of days (leave empty = ongoing)', ph_days: 'e.g. 7', rx_doctor: 'Prescribing vet', ph_rxdoc: 'Optional for supplements',
-    rx_reason: 'Reason', ph_reason: 'e.g. skin infection, joint care',
-    rx_remind: 'Remind me before it ends', rx_remind_days: 'Remind', days_unit: 'days before',
-    rx_active: 'Active', rx_ended: 'Finished', rx_longterm: '🔵 Ongoing', rx_last: 'Last day',
-    rx_going: '🟢 Active', rx_lastday_l: '🟡 Last day today', rx_ended_l: '⚪ Finished',
+    rx_add_title: 'Add medication / supplement', rx_edit_title: 'Edit medication record', rx_name: 'Medication / supplement name', ph_rxname: 'e.g. Prednisolone, fish oil',
+    rx_kind: 'Category', k_rx: 'Prescription', k_supp: 'Supplement', rx_start: 'Start date', rx_dose: 'Dose', ph_dose: 'e.g. half a tablet, 1 ml',
+    rx_freq: 'Frequency', ph_freq: 'e.g. twice a day', rx_days: 'Number of days (leave empty = ongoing)', ph_days: 'e.g. 7',
+    rx_doctor: 'Prescribing vet', ph_rxdoc: 'Optional for supplements', rx_reason: 'Reason', ph_reason: 'e.g. skin infection, joint care',
+    rx_remind: 'Remind me before it ends', rx_remind_days: 'Remind', days_unit: 'days before', rx_active: 'Active', rx_ended: 'Finished',
+    rx_longterm: '🔵 Ongoing', rx_last: 'Last day', rx_going: '🟢 Active', rx_lastday_l: '🟡 Last day today', rx_ended_l: '⚪ Finished',
     rx_left: '{n} day(s) left', rx_lastday: 'Today is the last day', rx_endedn: 'Finished {n} day(s) ago',
-    rx_remind_on: '🔔 Reminder: on', rx_remind_off: '🔕 Reminder: off',
-    rx_reason_l: 'Reason: ', rx_doctor_l: 'Vet: ', no_rx: 'No medication records yet 💊',
+    rx_remind_on: '🔔 Reminder: on', rx_remind_off: '🔕 Reminder: off', rx_reason_l: 'Reason: ', rx_doctor_l: 'Vet: ', no_rx: 'No medication records yet 💊',
     rp_add_title: 'Add test report', rp_edit_title: 'Edit test report', rp_type: 'Test type',
     rt_blood: 'Blood test', rt_xray: 'X-ray', rt_ultrasound: 'Ultrasound', rt_urine: 'Urine / stool test', rt_other: 'Other',
     rp_clinic: 'Clinic / lab', rp_summary: 'Result summary', ph_summary: 'e.g. kidney values slightly high', rp_opinion: "Vet's opinion", ph_opinion: 'e.g. recheck in two weeks',
-    no_reports: 'No test reports yet 🔬',
-    photos: 'Photos', files_lbl: 'Photos / PDF files',
+    no_reports: 'No test reports yet 🔬', photos: 'Photos', files_lbl: 'Photos / PDF files',
     hint_photos: 'Photos are compressed automatically; up to 10 per record', hint_files: 'Photos are compressed automatically; PDFs up to 5MB each; up to 10 files per record',
     w_edit: 'Edit weight', w_add: 'Log weight', date: 'Date', weight: 'Weight', note: 'Note', ph_wnote: 'e.g. after a meal', unit: 'Unit',
     trend: 'Weight trend', trend_empty: 'Add a weight record to see the chart', history: 'History', no_weights: 'No weight records yet 🐟',
@@ -965,67 +1323,75 @@ const I18N = {
     c_delmed: 'Delete this medication record?', c_delw: 'Delete this weight record?', c_delvax: 'Delete this vaccine record?',
     c_delev: 'Delete this event?', c_dellife: 'Delete this life log?', c_delvet: 'Delete this clinic?',
     c_delrx: 'Delete this medication record?', c_delrp: 'Delete this test report?',
+    c_deldm: 'Delete this daily medication? Its tick history will be deleted too.', c_delfl: 'Delete this fluid record?',
+    c_delplan: 'Delete the fluid plan? (Existing records are kept)', c_undofl: 'Undo this fluid record?',
     c_import: 'Importing will replace all current data (including photos and files). Continue?',
     t_copied: 'Backup code copied. Paste it into a note to keep it safe', t_manual: 'Long-press the text box, select all, then copy manually',
     t_badfmt: 'Invalid backup code format. Please paste the full code', t_invalid: 'This is not a valid backup code', t_restored: 'Restored data for {n} pet(s)',
     t_quota: 'Storage is full. Try removing large photos', t_restfail: 'Storage is full. Restore failed',
     t_cycle: 'Please enter a valid interval', t_wpos: 'Please enter a valid weight', t_days: 'Please enter a valid number of days',
+    t_ml: 'Please enter a valid amount (ml)', t_times: 'Please set at least one valid time', t_dates: 'End date cannot be before start date', t_int: 'Please enter a valid interval in days',
     t_maxfiles: 'Up to {n} files per record', t_toobig: 'File too large (PDF limit is 5MB)', t_imgonly: 'Only photos can be added here', t_badtype: 'Unsupported file type',
     t_filefail: 'Could not process the file. Please try again', t_missing: 'File not found (it may not be included in the backup)',
     t_exported: 'Backup file exported', t_exportfail: 'Export failed. Please try again', t_imported: 'Imported data for {n} pet(s)', t_importfail: 'Import failed: invalid file format',
     al_med_over: '⚠️ {pet}: {name} is overdue by {n} days! Please give it soon', al_med_today: "⏰ {pet}: {name} is due today. Don't forget!", al_med_soon: '⏰ {pet}: {name} is due in {n} days',
     al_vax_over: '⚠️ {pet}: {name} vaccine is overdue by {n} days! Please book an appointment', al_vax_today: '⏰ {pet}: {name} vaccine is due today!', al_vax_soon: '⏰ {pet}: {name} vaccine is due in {n} days',
     al_rx_over: '⚠️ {pet}: the {name} course ended {n} days ago. Refill or recheck needed?', al_rx_today: '⏰ {pet}: today is the last day of {name}', al_rx_soon: '⏰ {pet}: the {name} course ends in {n} days',
+    al_dose_due: '⏰ {pet}: time for {name} ({time})', al_dose_late: '⚠️ {pet}: {name} ({time}) is overdue and not logged',
+    al_fl_due: '⏰ {pet}: time for fluids ({time})', al_fl_late: '⚠️ {pet}: fluids ({time}) are overdue and not logged', al_fl_overdue: '⚠️ {pet}: fluids are overdue by {n} day(s)',
+    guide_title: 'User guide', w_title: 'Welcome', w_more: 'Full guide', w_ok: 'Got it',
+    w_p1: 'Data lives only on this phone. Export a full backup from "More" regularly.', w_p2: "Reminders only show while the app is open and won't ring when it's closed. Export to your calendar for alarms.", w_p3: 'Doses, frequencies and fluid amounts must follow your vet. The app only records and reminds.',
+    g1: 'Data is stored only in this phone\'s browser / app and does not sync to other devices, so we recommend recording on one phone only.',
+    g2: 'Back up regularly with "Export full backup" under "More". Always back up before switching phones or clearing browser data.',
+    g3: 'On iPhone, use Safari "Add to Home Screen" and avoid clearing Safari website data.',
+    g4: 'Reminders only appear while the app is open (top banner and Today\'s To-Do). Nothing rings once the app is closed. For alarms, use "Export to calendar" in "Daily meds" or "Sub-Q fluids".',
+    g5: 'After exporting to the calendar, if you change dose/session times, export again and delete the old events in your calendar yourself, otherwise you will get duplicate reminders.',
+    g6: 'Daily meds: a dose turns yellow when due and red after 2 hours without a record. Missed ticks can be back-filled by choosing the date in "Daily meds". If you change dose times, past days are shown with the new times.',
+    g7: 'Sub-Q fluids: log the actual amount and site each time; several sessions per day are fine. ml/kg uses the latest weight and is for reference only.',
+    g8: 'Doses, frequencies and fluid amounts must always follow your vet\'s instructions. This app only records and reminds; it gives no medical advice.',
+    g9: 'Photos are compressed automatically; PDFs are limited to 5MB each. The text backup code does not include photos or files.',
     demo_name: 'Mimi', demo_med1: 'Revolution', demo_hw: 'Heartworm preventive', demo_vax: 'FVRCP',
     demo_ev: 'Soft stool once this morning, otherwise normal.', demo_clinic: 'Sunny Pet Clinic', demo_vet: 'Dr. Wang',
   },
 };
 
 const emptyFiles = () => ({ files: [], added: [], removed: [] });
-
+const pad2 = n => String(n).padStart(2, '0');
 function petApp() {
   return {
-    data: { cats: [], activeId: null },   // data.cats 名稱維持不變，確保舊資料相容
-    tab: 'home',
-    msub: 'care',
-    lang: 'zh',
-    unit: 'kg',
+    data: { cats: [], activeId: null },
+    tab: 'home', msub: 'care', lang: 'zh', unit: 'kg', clock: Date.now(),
     tabs: [
-      { id: 'home', icon: '🐾' },
-      { id: 'weight', icon: '⚖️' },
-      { id: 'medical', icon: '🏥' },
-      { id: 'life', icon: '📘' },
-      { id: 'more', icon: '⚙️' },
+      { id: 'home', icon: '🐾' }, { id: 'weight', icon: '⚖️' }, { id: 'medical', icon: '🏥' },
+      { id: 'life', icon: '📘' }, { id: 'more', icon: '⚙️' },
     ],
     msubs: [
-      { id: 'care', icon: '🛡️' },
-      { id: 'rx', icon: '💊' },
-      { id: 'reports', icon: '🔬' },
-      { id: 'vaccine', icon: '💉' },
-      { id: 'events', icon: '📝' },
+      { id: 'daily', icon: '⏰' }, { id: 'fluids', icon: '💧' }, { id: 'care', icon: '🛡️' },
+      { id: 'rx', icon: '💊' }, { id: 'reports', icon: '🔬' }, { id: 'vaccine', icon: '💉' }, { id: 'events', icon: '📝' },
     ],
     speciesList: ['cat', 'dog', 'rabbit', 'other'],
     genderList: ['', 'male', 'female', 'male_n', 'female_n'],
     eventTypes: ['vomit', 'diarrhea', 'appetite', 'lethargy', 'cough', 'other'],
     lifeTypes: ['diet', 'behavior', 'mood', 'env', 'other'],
     reportTypes: ['blood', 'xray', 'ultrasound', 'urine', 'other'],
+    sites: ['l_shoulder', 'r_shoulder', 'l_flank', 'r_flank', 'other'],
+    guideKeys: ['g1', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7', 'g8', 'g9'],
 
-    petModal: false, clinicEdit: false,
-    cForm: {}, mForm: {}, wForm: {}, vForm: {}, eForm: {}, vetForm: {},
+    petModal: false, clinicEdit: false, fluidModal: false, planEdit: false, fluidShowAll: false,
+    welcomeModal: false, guideModal: false, skipBox: null, skipReason: '', dmDate: '',
+    cForm: {}, mForm: {}, wForm: {}, vForm: {}, eForm: {}, vetForm: {}, fForm: {},
+    dmForm: { times: [] }, planForm: { times: [] },
     lForm: { ...emptyFiles() }, rxForm: { ...emptyFiles() }, rpForm: { ...emptyFiles() },
     fileCache: {}, lightbox: null,
     confirmBox: null, toastMsg: '', toastTimer: null, backupText: '',
 
-    // ---------- 語言 / 單位 ----------
+    /* ---------- 語言 / 單位 ---------- */
     t(k, v) {
       let s = (I18N[this.lang] && I18N[this.lang][k]) || I18N.zh[k] || k;
       if (v) for (const x in v) s = s.split('{' + x + '}').join(v[x]);
       return s;
     },
-    lbl(prefix, code) {
-      const s = (I18N[this.lang] || {})[prefix + code];
-      return s || code;
-    },
+    lbl(prefix, code) { const s = (I18N[this.lang] || {})[prefix + code]; return s || code; },
     setLang(l) {
       this.lang = l;
       try { localStorage.setItem(LANG_KEY, l); } catch (e) {}
@@ -1039,7 +1405,6 @@ function petApp() {
     },
     speciesIcon(sp) { return { cat: '🐱', dog: '🐶', rabbit: '🐰' }[sp] || '🐾'; },
     reportIcon(t) { return { blood: '🩸', xray: '🦴', ultrasound: '🔍', urine: '🧪' }[t] || '📄'; },
-
     fromKg(kg) {
       kg = Number(kg);
       if (this.unit === 'g') return Math.round(kg * 1000);
@@ -1047,22 +1412,19 @@ function petApp() {
       return Math.round(kg * 100) / 100;
     },
     toKg(v) {
-      v = Number(v);
-      let kg = v;
-      if (this.unit === 'g') kg = v / 1000;
-      else if (this.unit === 'lb') kg = v / 2.20462;
+      v = Number(v); let kg = v;
+      if (this.unit === 'g') kg = v / 1000; else if (this.unit === 'lb') kg = v / 2.20462;
       return Math.round(kg * 10000) / 10000;
     },
     fmtW(kg) { return this.fromKg(kg) + ' ' + this.unit; },
 
-    // ---------- 檔案（相片／PDF） ----------
+    /* ---------- 檔案 ---------- */
     src(id) {
       if (this.fileCache[id] !== undefined) return this.fileCache[id];
       if (!requested.has(id)) {
         requested.add(id);
-        idbGet(id).then(r => {
-          this.fileCache = { ...this.fileCache, [id]: (r && r.type !== 'application/pdf') ? r.data : '' };
-        }).catch(() => { this.fileCache = { ...this.fileCache, [id]: '' }; });
+        idbGet(id).then(r => { this.fileCache = { ...this.fileCache, [id]: (r && r.type !== 'application/pdf') ? r.data : '' }; })
+          .catch(() => { this.fileCache = { ...this.fileCache, [id]: '' }; });
       }
       return '';
     },
@@ -1077,11 +1439,8 @@ function petApp() {
           else { const a = document.createElement('a'); a.href = url; a.download = f.name || 'file.pdf'; document.body.appendChild(a); a.click(); a.remove(); }
           setTimeout(() => URL.revokeObjectURL(url), 60000);
         } catch (e) { if (w) w.close(); this.say(this.t('t_filefail')); }
-      } else if (this.src(f.id)) {
-        this.lightbox = f.id;
-      } else {
-        this.say(this.t('t_missing'));
-      }
+      } else if (this.src(f.id)) { this.lightbox = f.id; }
+      else { this.say(this.t('t_missing')); }
     },
     async addFiles(form, ev, allowPdf) {
       const list = [...ev.target.files]; ev.target.value = '';
@@ -1114,29 +1473,20 @@ function petApp() {
       for (const id of ids) { try { await idbDel(id); } catch (e) {} requested.delete(id); }
       if (ids.length) { const c = { ...this.fileCache }; ids.forEach(id => delete c[id]); this.fileCache = c; }
     },
-    async commitForm(form) {
-      const ids = (form.removed || []).map(id => ({ id }));
-      form.removed = []; form.added = [];
-      await this.removeFiles(ids);
-    },
-    async discardForm(form) {
-      const ids = (form.added || []).map(id => ({ id }));
-      form.added = []; form.removed = [];
-      await this.removeFiles(ids);
-    },
+    async commitForm(form) { const ids = (form.removed || []).map(id => ({ id })); form.removed = []; form.added = []; await this.removeFiles(ids); },
+    async discardForm(form) { const ids = (form.added || []).map(id => ({ id })); form.added = []; form.removed = []; await this.removeFiles(ids); },
     async discardAll() {
       await Promise.all([this.discardForm(this.lForm), this.discardForm(this.rxForm), this.discardForm(this.rpForm)]);
       this.resetLife(); this.resetRx(); this.resetReport();
     },
     plainFiles(arr) { return (arr || []).map(x => ({ id: x.id, name: x.name, type: x.type })); },
 
-    // ---------- 備份 ----------
+    /* ---------- 備份 ---------- */
     copyBackup() {
       this.backupText = JSON.stringify(this.data);
       const sel = () => this.$nextTick(() => { const b = document.getElementById('backupBox'); if (b) { b.focus(); b.select(); } });
-      try {
-        navigator.clipboard.writeText(this.backupText).then(() => this.say(this.t('t_copied')), () => { sel(); this.say(this.t('t_manual')); });
-      } catch (e) { sel(); this.say(this.t('t_manual')); }
+      try { navigator.clipboard.writeText(this.backupText).then(() => this.say(this.t('t_copied')), () => { sel(); this.say(this.t('t_manual')); }); }
+      catch (e) { sel(); this.say(this.t('t_manual')); }
     },
     restoreBackup() {
       let d;
@@ -1149,22 +1499,24 @@ function petApp() {
         setTimeout(() => window.location.reload(), 300);
       });
     },
+    async shareOrDownload(file) {
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: file.name }); return true; }
+        catch (e) { if (e && e.name === 'AbortError') return false; }
+      }
+      const url = URL.createObjectURL(file);
+      const a = document.createElement('a'); a.href = url; a.download = file.name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      return true;
+    },
     async exportFull() {
       try {
         const all = await idbAll(), files = {};
         all.forEach(r => { files[r.id] = { name: r.name, type: r.type, data: r.data }; });
-        const json = JSON.stringify({ app: 'pet-health-tracker', version: 2, data: this.data, files });
-        const name = 'pet-backup-' + this.today() + '.json';
-        const file = new File([json], name, { type: 'application/json' });
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          try { await navigator.share({ files: [file], title: name }); this.say(this.t('t_exported')); return; }
-          catch (e) { if (e && e.name === 'AbortError') return; }
-        }
-        const url = URL.createObjectURL(file);
-        const a = document.createElement('a'); a.href = url; a.download = name;
-        document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 10000);
-        this.say(this.t('t_exported'));
+        const json = JSON.stringify({ app: 'pet-health-tracker', version: 3, data: this.data, files });
+        const file = new File([json], 'pet-backup-' + this.today() + '.json', { type: 'application/json' });
+        if (await this.shareOrDownload(file)) this.say(this.t('t_exported'));
       } catch (e) { this.say(this.t('t_exportfail')); }
     },
     importFull(ev) {
@@ -1177,10 +1529,7 @@ function petApp() {
         const files = (p.data && p.files) ? p.files : null;
         this.ask(this.t('c_import'), async () => {
           try {
-            if (files) {
-              await idbClear();
-              for (const id in files) { const x = files[id]; await idbPut({ id, name: x.name, type: x.type, data: x.data }); }
-            }
+            if (files) { await idbClear(); for (const id in files) { const x = files[id]; await idbPut({ id, name: x.name, type: x.type, data: x.data }); } }
             if (!d.cats.find(c => c.id === d.activeId)) d.activeId = d.cats.length ? d.cats[0].id : null;
             localStorage.setItem(KEY, JSON.stringify(d));
             this.say(this.t('t_imported', { n: d.cats.length }));
@@ -1193,15 +1542,19 @@ function petApp() {
     ask(msg, fn) { this.confirmBox = { msg, fn }; },
     yes() { const b = this.confirmBox; this.confirmBox = null; if (b && b.fn) b.fn(); },
     say(msg) { this.toastMsg = msg; clearTimeout(this.toastTimer); this.toastTimer = setTimeout(() => this.toastMsg = '', 2800); },
-
-    // ---------- 初始化 ----------
+    closeWelcome(more) {
+      try { localStorage.setItem(WELCOME_KEY, '1'); } catch (e) {}
+      this.welcomeModal = false;
+      if (more) this.guideModal = true;
+    },
+    /* ---------- 初始化 ---------- */
     init() {
+      this.clock = Date.now();
       let hadData = false;
       try {
         const s = JSON.parse(localStorage.getItem(KEY));
         if (s && s.cats) {
           hadData = s.cats.length > 0;
-          // 自動升級舊資料：補欄位 + 中文值轉代碼
           s.cats.forEach(c => {
             if (!c.species) c.species = 'cat';
             if (!c.lifeLogs) c.lifeLogs = [];
@@ -1213,6 +1566,10 @@ function petApp() {
             if (!c.events) c.events = [];
             if (!c.rx) c.rx = [];
             if (!c.reports) c.reports = [];
+            if (!c.daily) c.daily = [];
+            if (!c.dlog) c.dlog = {};
+            if (!c.fluids) c.fluids = [];
+            if (c.fluidPlan === undefined) c.fluidPlan = null;
             c.gender = norm(c.gender || '');
             c.meds.forEach(m => { m.type = norm(m.type); });
             c.events.forEach(e => { e.type = norm(e.type); });
@@ -1224,10 +1581,8 @@ function petApp() {
         }
       } catch (e) {}
 
-      // 要求瀏覽器盡量保留資料（避免被自動清走）
       try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}
 
-      // 語言：已儲存 > 舊用戶預設中文 > 按瀏覽器語言
       let l = null, u = null;
       try { l = localStorage.getItem(LANG_KEY); u = localStorage.getItem(UNIT_KEY); } catch (e) {}
       this.lang = (l === 'zh' || l === 'en') ? l : (hadData ? 'zh' : ((navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : 'en'));
@@ -1235,8 +1590,9 @@ function petApp() {
       this.applyLang();
 
       if (this.data.cats.length && !this.data.cats.find(c => c.id === this.data.activeId)) this.data.activeId = this.data.cats[0].id;
+      this.dmDate = this.today();
       this.resetMed(); this.resetWeight(); this.resetVaccine(); this.resetEvent();
-      this.resetLife(); this.resetVet(); this.resetRx(); this.resetReport();
+      this.resetLife(); this.resetVet(); this.resetRx(); this.resetReport(); this.resetDm();
 
       this.$watch('data', () => {
         try { localStorage.setItem(KEY, JSON.stringify(this.data)); } catch (e) { this.say(this.t('t_quota')); }
@@ -1245,25 +1601,35 @@ function petApp() {
       this.$watch('tab', () => setTimeout(() => this.drawChart(), 50));
       this.$watch('unit', () => {
         try { localStorage.setItem(UNIT_KEY, this.unit); } catch (e) {}
-        this.resetWeight();
-        setTimeout(() => this.drawChart(), 50);
+        this.resetWeight(); setTimeout(() => this.drawChart(), 50);
       });
       this.$watch('data.activeId', () => {
-        this.clinicEdit = false; this.resetMed(); this.resetWeight(); this.resetVaccine();
+        this.clinicEdit = false; this.planEdit = false; this.fluidShowAll = false;
+        this.resetMed(); this.resetWeight(); this.resetVaccine(); this.resetDm();
         this.discardAll();
         setTimeout(() => this.drawChart(), 50);
       });
+
+      const refresh = () => { this.clock = Date.now(); };
+      setInterval(refresh, 30000);
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+      window.addEventListener('focus', refresh);
+      window.addEventListener('pageshow', refresh);
+
+      try { if (!localStorage.getItem(WELCOME_KEY)) this.welcomeModal = true; } catch (e) {}
     },
 
-    // ---------- 日期工具 ----------
-    today() { const d = new Date(); return this.iso(d); },
-    iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); },
+    /* ---------- 日期／時間工具 ---------- */
+    today() { return this.iso(new Date(this.clock)); },
+    nowHM() { const d = new Date(this.clock); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); },
+    mins(hm) { const [h, m] = String(hm || '0:0').split(':').map(Number); return (h || 0) * 60 + (m || 0); },
+    iso(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); },
     parse(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); },
     addDays(s, n) { const d = this.parse(s); d.setDate(d.getDate() + Number(n)); return this.iso(d); },
     diffDays(s) { return Math.round((this.parse(s) - this.parse(this.today())) / 86400000); },
     age(b) {
       if (!b) return '';
-      const bd = this.parse(b), n = new Date();
+      const bd = this.parse(b), n = new Date(this.clock);
       let m = (n.getFullYear() - bd.getFullYear()) * 12 + n.getMonth() - bd.getMonth();
       if (n.getDate() < bd.getDate()) m--;
       if (m < 0) return '';
@@ -1271,46 +1637,381 @@ function petApp() {
       if (this.lang === 'zh') return y ? `${y} 歲${r ? ' ' + r + ' 個月' : ''}` : `${r} 個月大`;
       return y ? `${y} yr${y > 1 ? 's' : ''}${r ? ' ' + r + ' mo' : ''}` : `${r} mo old`;
     },
-
-    // ---------- 計算屬性 ----------
+/* ---------- 計算屬性 ---------- */
     get pet() { return this.data.cats.find(c => c.id === this.data.activeId) || null; },
+    findPet(id) { return this.data.cats.find(c => c.id === id) || null; },
+    latestWeightOf(p) { if (!p || !p.weights.length) return null; return [...p.weights].sort((a, b) => b.date.localeCompare(a.date))[0]; },
+    get latestWeight() { return this.latestWeightOf(this.pet); },
     get medTypesFor() {
       const sp = this.pet ? this.pet.species : 'cat';
       return (sp === 'cat' || sp === 'dog') ? ['flea', 'heartworm', 'dewormer', 'chronic'] : ['flea', 'dewormer', 'chronic'];
     },
-    get vaccSuggest() {
-      const sp = this.pet ? this.pet.species : 'cat';
-      return (VACC[sp] || VACC.other)[this.lang];
-    },
-    get latestWeight() {
-      if (!this.pet || !this.pet.weights.length) return null;
-      return [...this.pet.weights].sort((a, b) => b.date.localeCompare(a.date))[0];
-    },
+    get vaccSuggest() { const sp = this.pet ? this.pet.species : 'cat'; return (VACC[sp] || VACC.other)[this.lang]; },
     get sortedMeds() { return [...this.pet.meds].sort((a, b) => this.nextDate(a).localeCompare(this.nextDate(b))); },
     get nextMedSummary() {
       if (!this.pet || !this.pet.meds.length) return {};
-      const m = this.sortedMeds[0];
-      return { date: this.nextDate(m), name: m.name };
+      const m = this.sortedMeds[0]; return { date: this.nextDate(m), name: m.name };
     },
     get nextVaccineSummary() {
       if (!this.pet) return {};
       const l = this.pet.vaccines.filter(v => v.next).sort((a, b) => a.next.localeCompare(b.next));
-      const upcoming = l.find(v => this.diffDays(v.next) >= 0) || l[0];
-      return upcoming ? { date: upcoming.next, name: upcoming.name } : {};
+      const up = l.find(v => this.diffDays(v.next) >= 0) || l[0];
+      return up ? { date: up.next, name: up.name } : {};
     },
     get rxActive() {
       if (!this.pet) return [];
-      return this.pet.rx.filter(r => !this.rxStatus(r).ended)
-        .sort((a, b) => (this.rxLast(a) || '9999-99-99').localeCompare(this.rxLast(b) || '9999-99-99'));
+      return this.pet.rx.filter(r => !this.rxStatus(r).ended).sort((a, b) => (this.rxLast(a) || '9999-99-99').localeCompare(this.rxLast(b) || '9999-99-99'));
     },
     get rxEnded() {
       if (!this.pet) return [];
       return this.pet.rx.filter(r => this.rxStatus(r).ended).sort((a, b) => this.rxLast(b).localeCompare(this.rxLast(a)));
     },
-    get reportsSorted() {
-      if (!this.pet) return [];
-      return [...this.pet.reports].sort((a, b) => b.date.localeCompare(a.date));
+    get reportsSorted() { return this.pet ? [...this.pet.reports].sort((a, b) => b.date.localeCompare(a.date)) : []; },
+/* ---------- 每日藥物／待辦 ---------- */
+    slotStatus(date, time, ls) {
+      if (ls) return ls === 'd' ? 'done' : 'skipped';
+      const today = this.today();
+      if (date < today) return 'missed';
+      if (date > today) return 'future';
+      const diff = this.mins(this.nowHM()) - this.mins(time);
+      if (diff < 0) return 'upcoming';
+      return diff <= GRACE_MIN ? 'due' : 'late';
     },
+    medOn(m, date) { return m.start <= date && (!m.end || m.end >= date); },
+    sortedTimes(m) { return [...m.times].sort(); },
+    medSlots(p, date) {
+      const out = [];
+      for (const m of (p.daily || [])) {
+        if (!this.medOn(m, date)) continue;
+        for (const tm of [...m.times].sort()) {
+          const k = m.id + '|' + date + '|' + tm, lg = (p.dlog || {})[k];
+          out.push({ key: 'dm' + k, kind: 'med', petId: p.id, petName: p.name, medId: m.id, date, time: tm, slot: '', title: m.name, sub: m.dose || '', status: this.slotStatus(date, tm, lg ? lg.s : null), log: lg || null, overdueDays: 0 });
+        }
+      }
+      return out;
+    },
+    lastFluid(p) {
+      const l = (p.fluids || []).filter(r => !r.skipped).sort((a, b) => ((b.date + ' ' + (b.time || '')).localeCompare(a.date + ' ' + (a.time || ''))));
+      return l[0] || null;
+    },
+    fluidDue(p) {
+      const pl = p.fluidPlan;
+      if (!pl || pl.on === false || pl.mode !== 'interval') return null;
+      const last = this.lastFluid(p);
+      return last ? this.addDays(last.date, pl.intervalDays || 1) : (pl.start || this.today());
+    },
+    fluidSlots(p, date) {
+      const pl = p.fluidPlan, out = [];
+      if (!pl || pl.on === false || !(Number(pl.perDose) > 0)) return out;
+      const today = this.today();
+      const sub = pl.perDose + ' ml' + (pl.fluid ? ' · ' + pl.fluid : '');
+      const title = '💧 ' + this.t('fl_title');
+      const base = { kind: 'fluid', petId: p.id, petName: p.name, date, title, sub };
+      if (pl.mode === 'interval') {
+        if (date !== today) return out;
+        const tm = (pl.times && pl.times[0]) || '09:00';
+        const rec = (p.fluids || []).find(r => r.date === date && r.slot === 'I');
+        let status, overdue = 0;
+        if (rec) status = rec.skipped ? 'skipped' : 'done';
+        else {
+          const due = this.fluidDue(p);
+          if (!due || due > date) return out;
+          if (due < date) { status = 'late'; overdue = -this.diffDays(due); }
+          else status = this.slotStatus(date, tm, null);
+        }
+        out.push({ ...base, key: 'fl' + p.id + '|' + date + '|I', time: tm, slot: 'I', status, rec: rec || null, overdueDays: overdue });
+        return out;
+      }
+      if (pl.start && date < pl.start) return out;
+      for (const tm of [...(pl.times || [])].sort()) {
+        const rec = (p.fluids || []).find(r => r.date === date && r.slot === tm);
+        const status = rec ? (rec.skipped ? 'skipped' : 'done') : this.slotStatus(date, tm, null);
+        out.push({ ...base, key: 'fl' + p.id + '|' + date + '|' + tm, time: tm, slot: tm, status, rec: rec || null, overdueDays: 0 });
+      }
+      return out;
+    },
+    get todayGroups() {
+      const today = this.today(), out = [];
+      for (const p of this.data.cats) {
+        const items = [...this.medSlots(p, today), ...this.fluidSlots(p, today)].sort((a, b) => a.time.localeCompare(b.time));
+        if (items.length) out.push({ petId: p.id, petName: p.name, species: p.species, items });
+      }
+      return out;
+    },
+    get dmItems() {
+      if (!this.pet) return [];
+      return this.medSlots(this.pet, this.dmDate || this.today()).sort((a, b) => a.time.localeCompare(b.time));
+    },
+    dmShift(n) { this.dmDate = this.addDays(this.dmDate || this.today(), n); },
+    get dmList() {
+      if (!this.pet) return [];
+      return [...this.pet.daily].sort((a, b) => (Number(this.isEnded(a)) - Number(this.isEnded(b))) || a.name.localeCompare(b.name));
+    },
+    isEnded(m) { return !!(m.end && m.end < this.today()); },
+    get histDays() { const t = this.today(), a = []; for (let i = 13; i >= 0; i--) a.push(this.addDays(t, -i)); return a; },
+    slotState(p, m, date, time) {
+      if (!this.medOn(m, date)) return 'na';
+      const lg = (p.dlog || {})[m.id + '|' + date + '|' + time];
+      return this.slotStatus(date, time, lg ? lg.s : null);
+    },
+    cellCls(s) {
+      return { done: 'bg-green-400', skipped: 'bg-yellow-300', missed: 'bg-red-400', late: 'bg-red-400', due: 'bg-amber-300' }[s] || 'bg-stone-200';
+    },
+    doseStats(p, m, days) {
+      let done = 0, skipped = 0, total = 0;
+      const today = this.today(), nowM = this.mins(this.nowHM());
+      for (let i = 0; i < days; i++) {
+        const d = this.addDays(today, -i);
+        if (!this.medOn(m, d)) continue;
+        for (const tm of m.times) {
+          if (d === today && this.mins(tm) > nowM) continue;
+          total++;
+          const lg = (p.dlog || {})[m.id + '|' + d + '|' + tm];
+          if (lg) { if (lg.s === 'd') done++; else skipped++; }
+        }
+      }
+      return { done, skipped, total };
+    },
+    rate7Text(m) { const s = this.doseStats(this.pet, m, 7); return this.t('dm_rate7', { d: s.done, t: s.total, s: s.skipped }); },
+
+    rowCls(s) {
+      return { done: 'bg-green-50 border-green-200', skipped: 'bg-stone-50 border-stone-200', due: 'bg-yellow-50 border-yellow-300', late: 'bg-red-50 border-red-300', missed: 'bg-red-50 border-red-300' }[s] || 'bg-orange-50 border-orange-100';
+    },
+    statusCls(s) {
+      return { done: 'text-green-600', skipped: 'text-stone-500', due: 'text-yellow-700', late: 'text-red-600', missed: 'text-red-600' }[s] || 'text-stone-400';
+    },
+    statusText(it) {
+      const s = it.status;
+      if (s === 'done') {
+        let x = this.t('sl_done');
+        const at = it.kind === 'med' ? (it.log && it.log.at) : (it.rec && it.rec.time);
+        if (at) x += ' · ' + at;
+        if (it.kind === 'fluid' && it.rec) x += ' · ' + it.rec.ml + ' ml';
+        return x;
+      }
+      if (s === 'skipped') {
+        const n = it.kind === 'med' ? (it.log && it.log.note) : (it.rec && it.rec.note);
+        return this.t('sl_skipped') + (n ? ' · ' + n : '');
+      }
+      if (it.overdueDays > 0) return this.t('sl_late') + ' · ' + this.t('fl_overdue', { n: it.overdueDays });
+      return this.t('sl_' + s);
+    },
+    isPending(it) { return ['upcoming', 'due', 'late', 'missed'].includes(it.status); },
+    isFinished(it) { return it.status === 'done' || it.status === 'skipped'; },
+    doItem(it) {
+      if (it.kind === 'med') this.markDose(it, 'd', '');
+      else this.openFluid({ petId: it.petId, slot: it.slot, date: it.date, time: it.time });
+    },
+    skipItem(it) { this.skipBox = it; this.skipReason = ''; },
+    undoItem(it) {
+      const p = this.findPet(it.petId); if (!p) return;
+      if (it.kind === 'med') { if (p.dlog) delete p.dlog[it.medId + '|' + it.date + '|' + it.time]; return; }
+      if (!it.rec) return;
+      const id = it.rec.id, del = () => { p.fluids = p.fluids.filter(r => r.id !== id); };
+      if (it.rec.skipped) del(); else this.ask(this.t('c_undofl'), del);
+    },
+    markDose(it, s, note) {
+      const p = this.findPet(it.petId); if (!p) return;
+      if (!p.dlog) p.dlog = {};
+      p.dlog[it.medId + '|' + it.date + '|' + it.time] = { s, at: (s === 'd' && it.date === this.today()) ? this.nowHM() : '', note: note || '' };
+    },
+    confirmSkip() {
+      const it = this.skipBox; if (!it) return;
+      const reason = (this.skipReason || '').trim();
+      if (it.kind === 'med') this.markDose(it, 's', reason);
+      else {
+        const p = this.findPet(it.petId); if (!p) return;
+        p.fluids.push({ id: uid(), date: it.date, time: it.time, ml: 0, fluid: '', site: '', note: reason, slot: it.slot, skipped: true });
+      }
+      this.skipBox = null; this.skipReason = '';
+    },
+
+    resetDm() { this.dmForm = { id: null, name: '', dose: '', times: ['08:00'], start: this.today(), end: '', note: '' }; },
+    saveDm() {
+      const f = this.dmForm, p = this.pet; if (!p) return;
+      const times = [...new Set((f.times || []).filter(x => /^\d{2}:\d{2}$/.test(x)))].sort();
+      if (!times.length) return this.say(this.t('t_times'));
+      if (f.end && f.end < f.start) return this.say(this.t('t_dates'));
+      const item = { id: f.id || uid(), name: f.name.trim(), dose: (f.dose || '').trim(), times, start: f.start, end: f.end || '', note: f.note || '' };
+      const i = p.daily.findIndex(x => x.id === item.id);
+      if (i >= 0) p.daily[i] = item; else p.daily.push(item);
+      this.resetDm();
+    },
+    editDm(m) {
+      this.dmForm = { id: m.id, name: m.name, dose: m.dose || '', times: [...m.times], start: m.start, end: m.end || '', note: m.note || '' };
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    delDm(id) {
+      this.ask(this.t('c_deldm'), () => {
+        const p = this.pet; if (!p) return;
+        Object.keys(p.dlog || {}).forEach(k => { if (k.startsWith(id + '|')) delete p.dlog[k]; });
+        p.daily = p.daily.filter(m => m.id !== id);
+        if (this.dmForm.id === id) this.resetDm();
+      });
+    },
+
+    /* ---------- 皮下水 ---------- */
+    perKgText(p, ml) {
+      const w = this.latestWeightOf(p), v = Number(ml);
+      if (!w || !(v > 0)) return '';
+      return this.t('perkg', { v: Math.round(v / w.kg * 10) / 10 });
+    },
+    planSummary(pl) {
+      if (!pl) return '';
+      const sep = this.lang === 'zh' ? '、' : ', ';
+      let s = pl.mode === 'interval'
+        ? this.t('fl_sum_int', { ml: pl.perDose, n: pl.intervalDays, time: (pl.times && pl.times[0]) || '09:00' })
+        : this.t('fl_sum_daily', { ml: pl.perDose, n: (pl.times || []).length, times: (pl.times || []).join(sep) });
+      if (pl.on === false) s += this.t('fl_off');
+      return s;
+    },
+    openPlan() {
+      const p = this.pet; if (!p) return;
+      const pl = p.fluidPlan;
+      this.planForm = pl
+        ? { on: pl.on !== false, fluid: pl.fluid || '', perDose: pl.perDose, mode: pl.mode || 'daily', times: [...((pl.times && pl.times.length) ? pl.times : ['09:00'])], intervalDays: pl.intervalDays || 2, start: pl.start || this.today() }
+        : { on: true, fluid: '', perDose: '', mode: 'daily', times: ['09:00'], intervalDays: 2, start: this.today() };
+      this.planEdit = true;
+    },
+    savePlan() {
+      const f = this.planForm, p = this.pet; if (!p) return;
+      const ml = Number(f.perDose);
+      if (!(ml > 0)) return this.say(this.t('t_ml'));
+      let times = [...new Set((f.times || []).filter(x => /^\d{2}:\d{2}$/.test(x)))].sort();
+      if (!times.length) return this.say(this.t('t_times'));
+      const iv = Math.floor(Number(f.intervalDays));
+      if (f.mode === 'interval' && !(iv >= 1)) return this.say(this.t('t_int'));
+      if (f.mode === 'interval') times = [(f.times && /^\d{2}:\d{2}$/.test(f.times[0])) ? f.times[0] : times[0]];
+      p.fluidPlan = { on: !!f.on, fluid: (f.fluid || '').trim(), perDose: Math.round(ml * 10) / 10, mode: f.mode, times, intervalDays: iv >= 1 ? iv : 2, start: f.start || this.today() };
+      this.planEdit = false;
+    },
+    delPlan() { this.ask(this.t('c_delplan'), () => { if (this.pet) this.pet.fluidPlan = null; this.planEdit = false; }); },
+    get fluidStats() {
+      const out = { todayTotal: 0, week: 0, avg: 0, last: null };
+      if (!this.pet) return out;
+      const today = this.today(), from = this.addDays(today, -6);
+      let td = 0, wk = 0;
+      for (const r of this.pet.fluids) {
+        if (r.skipped) continue;
+        const v = Number(r.ml) || 0;
+        if (r.date === today) td += v;
+        if (r.date >= from && r.date <= today) wk += v;
+      }
+      out.todayTotal = Math.round(td * 10) / 10; out.week = Math.round(wk * 10) / 10; out.avg = Math.round(wk / 7 * 10) / 10;
+      out.last = this.lastFluid(this.pet);
+      return out;
+    },
+    get fluidNext() {
+      if (!this.pet) return null;
+      const due = this.fluidDue(this.pet);
+      return due ? { date: due, days: this.diffDays(due) } : null;
+    },
+    get fluidAllDays() {
+      if (!this.pet) return [];
+      const map = {};
+      for (const r of this.pet.fluids) (map[r.date] = map[r.date] || []).push(r);
+      return Object.keys(map).sort().reverse().map(d => {
+        const items = map[d].slice().sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+        const total = items.reduce((s, r) => s + (r.skipped ? 0 : (Number(r.ml) || 0)), 0);
+        return { date: d, items, total: Math.round(total * 10) / 10 };
+      });
+    },
+    get fluidDays() { const a = this.fluidAllDays; return this.fluidShowAll ? a : a.slice(0, 30); },
+    autoSlot(p, date, time) {
+      const pl = p.fluidPlan;
+      if (!pl || pl.on === false) return '';
+      if (pl.mode === 'interval') return (p.fluids || []).some(r => r.date === date && r.slot === 'I') ? '' : 'I';
+      const taken = new Set((p.fluids || []).filter(r => r.date === date && r.slot).map(r => r.slot));
+      const free = (pl.times || []).filter(x => !taken.has(x));
+      if (!free.length) return '';
+      const tm = this.mins(time);
+      free.sort((a, b) => Math.abs(this.mins(a) - tm) - Math.abs(this.mins(b) - tm));
+      return free[0];
+    },
+    openFluid(o) {
+      const p = this.findPet(o.petId); if (!p) return;
+      const pl = p.fluidPlan, d = this.today(), now = this.nowHM();
+      if (o.rec) {
+        const r = o.rec;
+        this.fForm = { id: r.id, petId: p.id, date: r.date, time: r.time || now, ml: r.skipped ? (pl ? pl.perDose : '') : r.ml, fluid: r.fluid || (pl ? (pl.fluid || '') : ''), site: r.site || '', note: r.skipped ? '' : (r.note || ''), slot: r.slot || '' };
+      } else {
+        this.fForm = { id: null, petId: p.id, date: o.date || d, time: (o.date && o.date !== d) ? (o.time || now) : now, ml: pl ? pl.perDose : '', fluid: pl ? (pl.fluid || '') : '', site: '', note: '', slot: o.slot || '' };
+      }
+      this.fluidModal = true;
+    },
+    saveFluid() {
+      const f = this.fForm, p = this.findPet(f.petId); if (!p) return;
+      const ml = Number(f.ml);
+      if (!(ml > 0)) return this.say(this.t('t_ml'));
+      let slot = f.slot || '';
+      if (!f.id && !slot) slot = this.autoSlot(p, f.date, f.time || this.nowHM());
+      const item = { id: f.id || uid(), date: f.date, time: f.time || '', ml: Math.round(ml * 10) / 10, fluid: (f.fluid || '').trim(), site: f.site || '', note: (f.note || '').trim(), slot, skipped: false };
+      const i = p.fluids.findIndex(r => r.id === item.id);
+      if (i >= 0) p.fluids[i] = item; else p.fluids.push(item);
+      this.fluidModal = false;
+    },
+    delFluid(id) { this.ask(this.t('c_delfl'), () => { if (this.pet) this.pet.fluids = this.pet.fluids.filter(r => r.id !== id); }); },
+    fPetName() { const p = this.findPet(this.fForm.petId); return p ? this.speciesIcon(p.species) + ' ' + p.name : ''; },
+    fPerKg() { return this.perKgText(this.findPet(this.fForm.petId), this.fForm.ml); },
+    fLastSite() {
+      const p = this.findPet(this.fForm.petId); if (!p) return '';
+      const l = (p.fluids || []).filter(r => !r.skipped && r.site && r.id !== this.fForm.id).sort((a, b) => (b.date + (b.time || '')).localeCompare(a.date + (a.time || '')))[0];
+      return l ? this.lbl('sx_', l.site) : '';
+    },
+
+    /* ---------- 日曆匯出 (.ics) ---------- */
+    icsFold(line) {
+      const enc = new TextEncoder(); let out = '', cur = '', bytes = 0;
+      for (const ch of line) {
+        const b = enc.encode(ch).length;
+        if (bytes + b > 73) { out += cur + '\r\n '; cur = ''; bytes = 1; }
+        cur += ch; bytes += b;
+      }
+      return out + cur;
+    },
+    exportCalendar() {
+      const p = this.pet; if (!p) return;
+      const today = this.today();
+      const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+      const d8 = s => s.replace(/-/g, ''), t6 = tm => tm.replace(':', '') + '00';
+      const esc = s => String(s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+      const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Pet Health Tracker//EN', 'CALSCALE:GREGORIAN'];
+      let n = 0;
+      const addEv = (key, summary, desc, startDate, tm, rrule) => {
+        lines.push('BEGIN:VEVENT', 'UID:' + key + '@pet-health-tracker', 'DTSTAMP:' + stamp, 'DTSTART:' + d8(startDate) + 'T' + t6(tm), 'DURATION:PT15M', 'RRULE:' + rrule,
+          'SUMMARY:' + esc(summary), 'DESCRIPTION:' + esc(desc), 'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + esc(summary), 'TRIGGER:PT0M', 'END:VALARM', 'END:VEVENT');
+        n++;
+      };
+      for (const m of p.daily) {
+        if (m.end && m.end < today) continue;
+        const start = m.start > today ? m.start : today;
+        const rr = 'FREQ=DAILY' + (m.end ? ';UNTIL=' + d8(m.end) + 'T235959' : '');
+        for (const tm of m.times) addEv(m.id + '-' + tm.replace(':', ''), this.t('cal_dose', { pet: p.name, name: m.name, dose: m.dose ? ' ' + m.dose : '' }), m.note || '', start, tm, rr);
+      }
+      const pl = p.fluidPlan;
+      if (pl && pl.on !== false && Number(pl.perDose) > 0) {
+        const summary = this.t('cal_fluid', { pet: p.name, ml: pl.perDose });
+        if (pl.mode === 'interval') {
+          let first = this.fluidDue(p) || today; if (first < today) first = today;
+          const tm = (pl.times && pl.times[0]) || '09:00';
+          addEv('fl-' + p.id + '-i', summary, pl.fluid || '', first, tm, 'FREQ=DAILY;INTERVAL=' + (pl.intervalDays || 1));
+        } else {
+          const start = (pl.start && pl.start > today) ? pl.start : today;
+          for (const tm of (pl.times || [])) addEv('fl-' + p.id + '-' + tm.replace(':', ''), summary, pl.fluid || '', start, tm, 'FREQ=DAILY');
+        }
+      }
+      if (!n) return this.say(this.t('cal_none'));
+      lines.push('END:VCALENDAR');
+      const text = lines.map(l => this.icsFold(l)).join('\r\n') + '\r\n';
+      this.ask(this.t('cal_warn'), async () => {
+        try {
+          const file = new File([text], 'pet-reminders.ics', { type: 'text/calendar' });
+          if (await this.shareOrDownload(file)) this.say(this.t('cal_done'));
+        } catch (e) { this.say(this.t('cal_fail')); }
+      });
+    },
+
+    /* ---------- 提醒橫幅 ---------- */
     get alerts() {
       const out = [];
       for (const c of this.data.cats) {
@@ -1336,10 +2037,18 @@ function petApp() {
           else if (d <= lim) out.push({ key: 'r' + r.id, days: d, text: this.t(d === 0 ? 'al_rx_today' : 'al_rx_soon', p) });
         }
       }
+      for (const g of this.todayGroups) for (const it of g.items) {
+        if (it.status !== 'due' && it.status !== 'late') continue;
+        const p = { pet: g.petName, name: it.title, time: it.time, n: it.overdueDays || 0 };
+        let text;
+        if (it.kind === 'med') text = this.t(it.status === 'late' ? 'al_dose_late' : 'al_dose_due', p);
+        else text = it.overdueDays > 0 ? this.t('al_fl_overdue', p) : this.t(it.status === 'late' ? 'al_fl_late' : 'al_fl_due', p);
+        out.push({ key: 'd' + it.key, days: it.status === 'late' ? -1 : 0, text });
+      }
       return out.sort((a, b) => a.days - b.days);
     },
 
-    // ---------- 寵物 ----------
+    /* ---------- 寵物 ---------- */
     openPet(c) {
       this.cForm = c ? { ...c } : { id: null, name: '', species: 'cat', birth: '', gender: '', breed: '', chip: '', photo: '' };
       this.petModal = true;
@@ -1349,7 +2058,7 @@ function petApp() {
         const c = this.data.cats.find(x => x.id === this.cForm.id);
         Object.assign(c, { name: this.cForm.name, species: this.cForm.species, birth: this.cForm.birth, gender: this.cForm.gender, breed: this.cForm.breed, chip: this.cForm.chip, photo: this.cForm.photo });
       } else {
-        const c = { ...this.cForm, id: uid(), meds: [], weights: [], vaccines: [], events: [], lifeLogs: [], vets: [], rx: [], reports: [], clinic: { name: '', vet: '', phone: '', address: '' } };
+        const c = { ...this.cForm, id: uid(), meds: [], weights: [], vaccines: [], events: [], lifeLogs: [], vets: [], rx: [], reports: [], daily: [], dlog: {}, fluids: [], fluidPlan: null, clinic: { name: '', vet: '', phone: '', address: '' } };
         this.data.cats.push(c); this.data.activeId = c.id; this.tab = 'home';
       }
       this.petModal = false;
@@ -1359,10 +2068,7 @@ function petApp() {
       const id = this.cForm.id;
       this.ask(this.t('c_delpet', { name: this.cForm.name }), () => {
         const c = this.data.cats.find(x => x.id === id);
-        if (c) {
-          const all = [].concat((c.lifeLogs || []).flatMap(x => x.files || []), (c.rx || []).flatMap(x => x.files || []), (c.reports || []).flatMap(x => x.files || []));
-          this.removeFiles(all);
-        }
+        if (c) this.removeFiles([].concat((c.lifeLogs || []).flatMap(x => x.files || []), (c.rx || []).flatMap(x => x.files || []), (c.reports || []).flatMap(x => x.files || [])));
         this.data.cats = this.data.cats.filter(x => x.id !== id);
         this.data.activeId = this.data.cats.length ? this.data.cats[0].id : null;
         this.petModal = false;
@@ -1395,13 +2101,12 @@ function petApp() {
         weights: [-120, -90, -60, -30, 0].map((o, i) => ({ id: uid(), date: this.addDays(t, o), kg: [3.9, 4.0, 4.1, 4.15, 4.2][i], note: '' })),
         vaccines: [{ id: uid(), name: this.t('demo_vax'), date: this.addDays(t, -360), next: this.addDays(t, 5) }],
         events: [{ id: uid(), date: this.addDays(t, -2), type: 'diarrhea', note: this.t('demo_ev') }],
-        lifeLogs: [], vets: [], rx: [], reports: [],
+        lifeLogs: [], vets: [], rx: [], reports: [], daily: [], dlog: {}, fluids: [], fluidPlan: null,
         clinic: { name: this.t('demo_clinic'), vet: this.t('demo_vet'), phone: '0212345678', address: '' },
       });
       this.data.activeId = id;
     },
-
-    // ---------- 驅蟲／預防藥 ----------
+    /* ---------- 驅蟲／預防藥 ---------- */
     nextDate(m) { return this.addDays(m.last, m.cycle); },
     statusOf(m) {
       const d = this.diffDays(this.nextDate(m));
@@ -1432,7 +2137,7 @@ function petApp() {
     markFed(m) { m.last = this.today(); },
     delMed(id) { this.ask(this.t('c_delmed'), () => { this.pet.meds = this.pet.meds.filter(m => m.id !== id); }); },
 
-    // ---------- 用藥紀錄（處方／保健品） ----------
+    /* ---------- 用藥紀錄（處方／保健品） ---------- */
     hasDays(v) { return v !== '' && v !== null && v !== undefined && Number(v) > 0; },
     rxLast(r) { return r.days ? this.addDays(r.start, Number(r.days) - 1) : null; },
     rxStatus(r) {
@@ -1443,9 +2148,7 @@ function petApp() {
       if (d === 0) return { label: this.t('rx_lastday_l'), cls: 'bg-yellow-100 text-yellow-700', detail: this.t('rx_lastday'), ended: false };
       return { label: this.t('rx_going'), cls: 'bg-green-100 text-green-700', detail: this.t('rx_left', { n: d + 1 }), ended: false };
     },
-    resetRx() {
-      this.rxForm = { id: null, name: '', kind: 'rx', dose: '', freq: '', start: this.today(), days: '', reason: '', doctor: '', note: '', remind: false, remindDays: 3, ...emptyFiles() };
-    },
+    resetRx() { this.rxForm = { id: null, name: '', kind: 'rx', dose: '', freq: '', start: this.today(), days: '', reason: '', doctor: '', note: '', remind: false, remindDays: 3, ...emptyFiles() }; },
     async saveRx() {
       const f = this.rxForm;
       const days = this.hasDays(f.days) ? Number(f.days) : null;
@@ -1454,8 +2157,7 @@ function petApp() {
       const item = {
         id: f.id || uid(), name: f.name.trim(), kind: f.kind, dose: f.dose, freq: f.freq, start: f.start, days,
         reason: f.reason, doctor: f.doctor, note: f.note,
-        remind: !!f.remind && days !== null, remindDays: (isNaN(rd) || rd < 0) ? 3 : rd,
-        files: this.plainFiles(f.files),
+        remind: !!f.remind && days !== null, remindDays: (isNaN(rd) || rd < 0) ? 3 : rd, files: this.plainFiles(f.files),
       };
       await this.commitForm(f);
       const i = this.pet.rx.findIndex(x => x.id === item.id);
@@ -1475,16 +2177,12 @@ function petApp() {
     async cancelRx() { await this.discardForm(this.rxForm); this.resetRx(); },
     delRx(id) {
       this.ask(this.t('c_delrx'), () => {
-        const r = this.pet.rx.find(x => x.id === id);
-        if (r) this.removeFiles(r.files);
+        const r = this.pet.rx.find(x => x.id === id); if (r) this.removeFiles(r.files);
         this.pet.rx = this.pet.rx.filter(x => x.id !== id);
       });
     },
-
-    // ---------- 檢查報告 ----------
-    resetReport() {
-      this.rpForm = { id: null, type: 'blood', date: this.today(), clinic: '', summary: '', opinion: '', ...emptyFiles() };
-    },
+    /* ---------- 檢查報告 ---------- */
+    resetReport() { this.rpForm = { id: null, type: 'blood', date: this.today(), clinic: '', summary: '', opinion: '', ...emptyFiles() }; },
     async saveReport() {
       const f = this.rpForm;
       const item = { id: f.id || uid(), type: f.type, date: f.date, clinic: f.clinic, summary: f.summary, opinion: f.opinion, files: this.plainFiles(f.files) };
@@ -1501,13 +2199,12 @@ function petApp() {
     async cancelReport() { await this.discardForm(this.rpForm); this.resetReport(); },
     delReport(id) {
       this.ask(this.t('c_delrp'), () => {
-        const r = this.pet.reports.find(x => x.id === id);
-        if (r) this.removeFiles(r.files);
+        const r = this.pet.reports.find(x => x.id === id); if (r) this.removeFiles(r.files);
         this.pet.reports = this.pet.reports.filter(x => x.id !== id);
       });
     },
 
-    // ---------- 體重 ----------
+    /* ---------- 體重 ---------- */
     resetWeight() { this.wForm = { id: null, date: this.today(), kg: '', note: '' }; },
     saveWeight() {
       const val = Number(this.wForm.kg);
@@ -1519,7 +2216,6 @@ function petApp() {
     },
     editWeight(w) { this.wForm = { id: w.id, date: w.date, kg: this.fromKg(w.kg), note: w.note }; window.scrollTo({ top: 0, behavior: 'smooth' }); },
     delWeight(id) { this.ask(this.t('c_delw'), () => { this.pet.weights = this.pet.weights.filter(w => w.id !== id); }); },
-
     drawChart() {
       if (this.tab !== 'weight' || !this.pet) return;
       if (typeof Chart === 'undefined') return;
@@ -1538,18 +2234,14 @@ function petApp() {
       });
     },
 
-    // ---------- 疫苗 ----------
+    /* ---------- 疫苗／事件／生活／診所 ---------- */
     resetVaccine() { this.vForm = { name: '', date: this.today(), next: '' }; },
     saveVaccine() { this.pet.vaccines.push({ id: uid(), ...this.vForm }); this.resetVaccine(); },
     delVaccine(id) { this.ask(this.t('c_delvax'), () => { this.pet.vaccines = this.pet.vaccines.filter(v => v.id !== id); }); },
-
-    // ---------- 異常事件 ----------
     resetEvent() { this.eForm = { date: this.today(), type: this.eventTypes[0], note: '' }; },
     saveEvent() { this.pet.events.push({ id: uid(), ...this.eForm }); this.resetEvent(); },
     delEvent(id) { this.ask(this.t('c_delev'), () => { this.pet.events = this.pet.events.filter(e => e.id !== id); }); },
     eventIcon(t) { return { vomit: '🤮', diarrhea: '💩', appetite: '🍽️', lethargy: '😔', cough: '🤧' }[t] || '📌'; },
-
-    // ---------- 生活紀錄 ----------
     resetLife() { this.lForm = { date: this.today(), type: this.lifeTypes[0], note: '', ...emptyFiles() }; },
     async saveLife() {
       const f = this.lForm;
@@ -1560,19 +2252,15 @@ function petApp() {
     },
     delLife(id) {
       this.ask(this.t('c_dellife'), () => {
-        const l = this.pet.lifeLogs.find(x => x.id === id);
-        if (l) this.removeFiles(l.files);
+        const l = this.pet.lifeLogs.find(x => x.id === id); if (l) this.removeFiles(l.files);
         this.pet.lifeLogs = this.pet.lifeLogs.filter(x => x.id !== id);
       });
     },
-
-    // ---------- 診所通訊錄 ----------
     resetVet() { this.vetForm = { name: '', doctor: '', phone: '', note: '' }; },
     saveVet() { this.pet.vets.push({ id: uid(), ...this.vetForm }); this.resetVet(); },
     delVet(id) { this.ask(this.t('c_delvet'), () => { this.pet.vets = this.pet.vets.filter(v => v.id !== id); }); },
   };
 }
 </script>
-
 </body>
 </html>
